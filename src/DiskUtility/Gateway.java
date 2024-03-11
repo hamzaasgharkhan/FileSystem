@@ -21,6 +21,7 @@ public class Gateway {
     private final SuperBlock superBlock;
     private DirectoryStoreGateway directoryStoreGateway;
     private INodeStoreGateway iNodeStoreGateway;
+    private ExtentStoreGateway extentStoreGateway;
     private BitMapUtility bitMapUtility;
 
     public Gateway(SuperBlock superBlock, boolean firstCreation) throws Exception{
@@ -29,6 +30,7 @@ public class Gateway {
             this.bitMapUtility = new BitMapUtility(superBlock.getFileSystemName());
             this.directoryStoreGateway = new DirectoryStoreGateway(superBlock.getFileSystemName() + "/directory-store", bitMapUtility);
             this.iNodeStoreGateway = new INodeStoreGateway(superBlock.getFileSystemName() + "/inode-store", bitMapUtility);
+            this.extentStoreGateway = new ExtentStoreGateway(superBlock.getFileSystemName() + "/extent-store", bitMapUtility);
         } else {
             initializeFileSystem();
         }
@@ -56,6 +58,7 @@ public class Gateway {
             bitMapUtility = new BitMapUtility(superBlock.getFileSystemName());
             directoryStoreGateway = new DirectoryStoreGateway(superBlock.getFileSystemName() + "/directory-store", bitMapUtility);
             iNodeStoreGateway = new INodeStoreGateway(superBlock.getFileSystemName() + "/inode-store", bitMapUtility);
+            extentStoreGateway = new ExtentStoreGateway(superBlock.getFileSystemName() + "/extent-store", bitMapUtility);
         } catch (Exception e) {
             throw new IOException("[Gateway] Unable to initialize FileSystem\n"+ e.getMessage());
         }
@@ -111,6 +114,10 @@ public class Gateway {
             // Set ThumbnailStore Bitmap to empty
             path = Paths.get(prefix + "thumbnail-store.bitmap");
             Files.write(path, blockArray);
+            // Set ExtentStore Bitmap to empty
+            path = Paths.get(prefix + "extent-store.bitmap");
+            blockArray = new byte[]{(byte)0b00000000, (byte)0b00000000, (byte)0b00000000, (byte)0b00000000};
+            Files.write(path, blockArray);
         } catch (IOException e){
             throw new IOException("[Gateway] __createBitMapFiles Failed.\n" + e.getMessage());
         }
@@ -146,8 +153,9 @@ public class Gateway {
 
     private void __createExtentStoreFile() throws IOException {
         Path path = Paths.get(superBlock.getFileSystemName() + "/extent-store");
+        byte[] blockArray = ExtentStoreGateway.getDefaultBytes();
         try {
-            Files.createFile(path);
+            Files.write(path, blockArray);
         } catch (IOException e){
             throw new IOException("[Gateway] __createExtentStoreFileFailed failed.\n" + e.getMessage());
         }

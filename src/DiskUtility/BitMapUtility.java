@@ -187,11 +187,81 @@ public class BitMapUtility {
         int byteIndex = (int) (index / 2L);
         int bitIndex = (int) (index % 2L);
         byte requiredByte = dataStoreBitMap[byteIndex];
-        // Updated the byte.
         if (bitIndex == 0)
             return ((byte)(requiredByte & (byte)0b11110000)) == (byte)0b10010000;
         else
             return ((byte)(requiredByte & (byte)0b00001111)) == (byte)0b00001001;
+    }
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // EXTENT_STORE METHODS
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Returns free extent index that can hold consecutive extent entries
+     * @param totalEntries Number of consecutive entries / extent blocks needed
+     * @return Appropriate index within the extent store to store the specified number of extent entries
+     */
+    public long getFreeIndexExtentStore(int totalEntries) {
+        int runningFreeEntries = 0;
+        long firstIndex = -1;
+        for (int i = 0; i < extentStoreBitMap.length; i++){
+            // If all indices in byte are used.
+            if (extentStoreBitMap[i] == 0b01010101){
+                firstIndex = -1;
+                runningFreeEntries = 0;
+                continue;
+            }
+            for (int j = 3; j > -1; j--){
+                if (((extentStoreBitMap[i] >> (j * 2)) & 0b00000001) == 1){
+                    if (firstIndex == -1){
+                        firstIndex = (long)i * 4 + (3 - j);
+                        runningFreeEntries = 1;
+                    } else {
+                        runningFreeEntries++;
+                    }
+                    if (runningFreeEntries == totalEntries)
+                        return firstIndex;
+                } else {
+                    firstIndex = -1;
+                    runningFreeEntries = 0;
+                }
+            }
+        }
+        // The requirement could not be met with the current bitmap.
+        // Extending the bitmap.
+        int extendFactor = totalEntries / 16;
+        byte[] arr = new byte[extentStoreBitMap.length + (16 * (extendFactor + 1))];
+        System.arraycopy(extentStoreBitMap, 0, arr, 0, extentStoreBitMap.length);
+        for (int i = extentStoreBitMap.length; i< arr.length; i++){
+            arr[i] = (byte) 0b10101010;
+        }
+        extentStoreBitMap = arr;
+        setDirtyFlag("EXTENT_STORE");
+        writeToFile("EXTENT_STORE");
+        if (firstIndex == -1)
+            return extentStoreBitMap.length;
+        else
+            return firstIndex;
+    }
+    /**
+     * Checks whether a block with the given index exists on disk or not.
+     * @param index The index of the target block.
+     * @return true if and only if the block has been allocated on disk.
+     */
+    public boolean isExtentStoreIndexAllocated(long index, int totalEntries){
+        // NEEDS TO BE FIXED. Should return with respect to the last index of the entries. index + totalEntries
+        int byteIndex = (int) (index / 4L);
+        int bitIndex = (int) (index % 4L);
+        byte requiredByte = dataStoreBitMap[byteIndex];
+        return (((byte)(requiredByte >> 2 * (4 - bitIndex))) & 0b00000010) == 0;
+    }
+
+    /**
+     * @return index of the last allocated extent.
+     */
+    public long extentStoreGetLastAllocated(){
+        // IMPLEMENT
+        return 0;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // FILE UTILITIES
@@ -295,7 +365,7 @@ public class BitMapUtility {
                 throw new RuntimeException("Invalid Store Name");
         }
     }
-    private boolean getDirtyFlag(String storeName){
+    private boolean getDirtyFlag(String storeName) {
         return switch (storeName) {
             case "DIRECTORY_STORE" -> (dirtyFlags & 0b00000001) != 0;
             case "EXTENT_STORE" -> (dirtyFlags & 0b00000010) != 0;

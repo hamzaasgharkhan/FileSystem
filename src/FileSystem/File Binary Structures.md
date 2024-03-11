@@ -55,11 +55,11 @@
 
 #### ExtentStore Entry
     Magic Value                 -       4 bytes                                 || Starting Index: 0
-    DataStore Index             -       4 bytes                                 || Starting Index: 4
-    DataStore Offset            -       4 bytes                                 || Starting Index: 8
-    Length                      -       4 bytes                                 || Starting Index: 12 
+    DataStore Index             -       8 bytes                                 || Starting Index: 4
+    DataStore Offset            -       4 bytes                                 || Starting Index: 12
+    Length                      -       4 bytes                                 || Starting Index: 16 
 
-    Size: 16 Bytes
+    Size: 20 Bytes
 
 #### DataStore Block
     MD5 hash                    -      16 bytes                                 || Starting Index: 0

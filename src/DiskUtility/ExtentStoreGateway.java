@@ -1,8 +1,22 @@
 package DiskUtility;
 
+import Constants.EXTENT_STORE_FRAME;
+import Constants.VALUES;
+import Utilities.BinaryUtilities;
+
+import java.io.File;
 import java.util.LinkedList;
 
-public class ExtentStoreGateway {
+class ExtentStoreGateway {
+    private final BitMapUtility bitMapUtility;
+    File extentStoreFile;
+    ExtentStoreGateway(String path, BitMapUtility bitMapUtility) throws Exception{
+        File file = new File(path);
+        if (!file.exists())
+            throw new Exception("Extent Store File Does Not Exist.");
+        this.bitMapUtility = bitMapUtility;
+        extentStoreFile = file;
+    }
     static class ExtentFrame {
         long dataStoreIndex;
         int offset;
@@ -73,5 +87,60 @@ public class ExtentStoreGateway {
             return outputExtentFrames;
         }
     }
+    static byte[] getDefaultBytes(){
+        return new byte[EXTENT_STORE_FRAME.SIZE * 16];
+    }
 
+    /**
+     * This method takes a LinkedList of ExtentFrame objects and creates appropriate ExtentFrame entries for the frames.
+     * @param extentFrames LinkedList of target ExtentFrame objects
+     * @return An array of two longs. The first element is the extentAddress of the entry and the second element is the
+     * length of the extent entries.
+     */
+    public long[] addExtentEntry(LinkedList<ExtentFrame> extentFrames){
+        byte[] byteArray = new byte[EXTENT_STORE_FRAME.SIZE * extentFrames.size()];
+        for (int i = 0; i < extentFrames.size(); i++){
+            __addExtentEntry(byteArray, extentFrames.get(i), i);
+        }
+        long index = bitMapUtility.getFreeIndexExtentStore(extentFrames.size());
+
+        // IMPLEMENT
+//        ???????????????
+        return new long[]{};
+    }
+
+    /**
+     * This method takes a byteArray and an extentFrame. It adds the extentFrame to the specified index.
+     * @param byteArray The byteArray containing the extents.
+     * @param extentFrame The target extentFrame
+     * @param index The target index within the byteArray
+     */
+    private void __addExtentEntry(byte[] byteArray, ExtentFrame extentFrame, int index){
+        index = index * EXTENT_STORE_FRAME.SIZE;
+        System.arraycopy(
+                VALUES.MAGIC_VALUE_BYTES,
+                0,
+                byteArray,
+                index + EXTENT_STORE_FRAME.DATA_STORE_INDEX_INDEX,
+                4);
+        System.arraycopy(
+                BinaryUtilities.convertLongToBytes(extentFrame.dataStoreIndex),
+                0,
+                byteArray,
+                index + EXTENT_STORE_FRAME.DATA_STORE_INDEX_INDEX,
+                8);
+        System.arraycopy(
+                BinaryUtilities.convertIntToBytes(extentFrame.offset),
+                0,
+                byteArray,
+                index + EXTENT_STORE_FRAME.DATA_STORE_OFFSET_INDEX,
+                4);
+        System.arraycopy(
+                BinaryUtilities.convertLongToBytes(extentFrame.length),
+                0,
+                byteArray,
+                index + EXTENT_STORE_FRAME.LENGTH_INDEX,
+                8);
+
+    }
 }
