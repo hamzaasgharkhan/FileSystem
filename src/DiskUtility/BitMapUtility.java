@@ -133,10 +133,10 @@ public class BitMapUtility {
         int index = dataStoreBitMap.length;
         byte[] arr = new byte[index + 16];
         System.arraycopy(dataStoreBitMap, 0, arr, 0, index);
-        byte[] blankSlots = {(byte)0b10001000, (byte)0b10001000, (byte)0b10001000, (byte)0b10001000,
-                (byte)0b10001000, (byte)0b10001000, (byte)0b10001000, (byte)0b10001000,
-                (byte)0b10001000, (byte)0b10001000, (byte)0b10001000, (byte)0b10001000,
-                (byte)0b10001000, (byte)0b10001000, (byte)0b10001000, (byte)0b10001000};
+        byte[] blankSlots = {(byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
+                (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
+                (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
+                (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001};
         System.arraycopy(blankSlots, 0, arr, index, 16);
         dataStoreBitMap = arr;
         setDirtyFlag("DATA_STORE");
@@ -176,6 +176,22 @@ public class BitMapUtility {
         dataStoreBitMap[byteIndex] = requiredByte;
         setDirtyFlag("DATA_STORE");
         writeToFile("DATA_STORE");
+    }
+
+    /**
+     * Checks whether a block with the given index exists on disk or not.
+     * @param index The index of the target block.
+     * @return true if and only if the block has been allocated on disk.
+     */
+    public boolean isDataStoreIndexAllocated(long index){
+        int byteIndex = (int) (index / 2L);
+        int bitIndex = (int) (index % 2L);
+        byte requiredByte = dataStoreBitMap[byteIndex];
+        // Updated the byte.
+        if (bitIndex == 0)
+            return ((byte)(requiredByte & (byte)0b11110000)) == (byte)0b10010000;
+        else
+            return ((byte)(requiredByte & (byte)0b00001111)) == (byte)0b00001001;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // FILE UTILITIES

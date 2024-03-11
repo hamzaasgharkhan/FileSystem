@@ -103,10 +103,10 @@ public class Gateway {
             Files.write(path, blockArray);
             // Set DataStore Bitmap to empty
             path = Paths.get(prefix + "data-store.bitmap");
-            blockArray = new byte[]{(byte)0b10001000, (byte)0b10001000, (byte)0b10001000, (byte)0b10001000,
-                    (byte)0b10001000,(byte)0b10001000,(byte)0b10001000,(byte)0b10001000,
-                    (byte)0b10001000,(byte)0b10001000,(byte)0b10001000,(byte)0b10001000,
-                    (byte)0b10001000,(byte)0b10001000,(byte)0b10001000,(byte)0b10001000};
+            blockArray = new byte[]{(byte)0b10001001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
+                    (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
+                    (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
+                    (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001};
             Files.write(path, blockArray);
             // Set ThumbnailStore Bitmap to empty
             path = Paths.get(prefix + "thumbnail-store.bitmap");

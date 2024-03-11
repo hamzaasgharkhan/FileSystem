@@ -11,30 +11,7 @@ import java.util.LinkedList;
 /**
  * This class provides an interface between the DataStore files and the rest of the filesystem.
  */
-public class DataStoreGateway {
-    private static class ExtentFrame{
-        long dataStoreIndex;
-        int offset;
-        int length;
-        ExtentFrame(long dataStoreIndex, int offset, int length){
-            this.dataStoreIndex = dataStoreIndex;
-            this.offset = offset;
-            this.length = length;
-        }
-
-        /**
-         * This method takes a linked list of extent frames. The extents of the input linked list do not span over
-         * multiple blocks. The linked list of extents returned by the method has extents that may span over multiple
-         * data blocks.
-         * @param inputExtentFrames LinkedList of ExtentFrame objects that are restricted to a single data block.
-         * @return A LinkedList of ExtentFrames that may span multiple data blocks.
-         */
-        static LinkedList<ExtentFrame> getCompactExtentList(LinkedList<ExtentFrame> inputExtentFrames){
-            // IMPLEMENT
-            return null;
-        }
-
-    }
+class DataStoreGateway {
     private static class DataBlock {
         static String getHash(byte[] arr){
             if (arr.length != 4096)
@@ -182,16 +159,16 @@ public class DataStoreGateway {
     }
     File dataStoreFile;
     final BitMapUtility bitMapUtility;
-    public DataStoreGateway(String path, BitMapUtility bitMapUtility) throws Exception {
+    DataStoreGateway(String path, BitMapUtility bitMapUtility) throws Exception {
         File file = new File(path);
         if (!file.exists())
             throw new Exception("Directory Store File Does Not Exist.");
         this.bitMapUtility = bitMapUtility;
         dataStoreFile = file;
     }
-    public INode addNode(File file) throws Exception{
+    LinkedList<ExtentStoreGateway.ExtentFrame> addNode(File file) throws Exception{
         // A LinkedList of ExtentFrame that will be used in the end to create extents that span across multiple blocks.
-        LinkedList<ExtentFrame> extentFramesLinkedList = new LinkedList<ExtentFrame>();
+        LinkedList<ExtentStoreGateway.ExtentFrame> extentFramesLinkedList = new LinkedList<ExtentStoreGateway.ExtentFrame>();
         long fileSize, bytesToWrite, index;
         // The bytesOccupied field of the block
         short bytesOccupied;
@@ -235,14 +212,18 @@ public class DataStoreGateway {
         while (bytesToWrite > 0){
             int bytesWrittenInRunningBlock = 0;
             index = bitMapUtility.getFreeIndexDataStore(bytesToWrite);
-            try {
-                dataFile.seek(index * 4096);
-                dataFile.readFully(dataBlock);
-            } catch (EOFException e){
-                throw new Exception("Error in dataBlock file. Either the provided index: " + index + " does not exist" +
-                        "in the data-store file or the contents of the data-store file have been corrupted." + e.getMessage());
-            } catch (IOException e){
-                throw new Exception("Unable to access the contents of data-store file."  + e.getMessage());
+            // If the dataBlock is allocated and exists on disk then read it from disk otherwise work with the empty
+            // block.
+            if (bitMapUtility.isDataStoreIndexAllocated(index)){
+                try {
+                    dataFile.seek(index * 4096);
+                    dataFile.readFully(dataBlock);
+                } catch (EOFException e){
+                    throw new Exception("Error in dataBlock file. Either the provided index: " + index + " does not exist" +
+                            "in the data-store file or the contents of the data-store file have been corrupted." + e.getMessage());
+                } catch (IOException e){
+                    throw new Exception("Unable to access the contents of data-store file."  + e.getMessage());
+                }
             }
             bytesOccupied = DataBlock.getBytesOccupied(dataBlock);
             int[] runs = DataBlock.getRuns(dataBlock);
@@ -276,7 +257,7 @@ public class DataStoreGateway {
                     bytesOccupied += (short) localBytesToWrite;
                     bytesWrittenInRunningBlock += localBytesToWrite;
                     pointer += localBytesToWrite;
-                    extentFramesLinkedList.add(new ExtentFrame(index, start, localBytesToWrite));
+                    extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
                 } else if (((pointer + bytesToWrite) > 4096) && (pointer + length) > 4096) {
                     // In this case, the buffer needs to be refreshed.
                     // The run can accommodate more than what the current buffer has. Buffer needs to be updated.
@@ -303,13 +284,12 @@ public class DataStoreGateway {
                     DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite);
                     bytesOccupied += (short) localBytesToWrite;
                     bytesWrittenInRunningBlock += localBytesToWrite;
-                    extentFramesLinkedList.add(new ExtentFrame(index, start, localBytesToWrite));
+                    extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
                 } else {
                     throw new Exception("BUG. THIS EXCEPTION SHOULD NEVER BE THROWN.");
                 }
                 bytesToWrite -= bytesWrittenInRunningBlock;
             }
-            // The following code will run in any condition
             DataBlock.setBytesOccupied(dataBlock, bytesOccupied);
             // CREATE FUNCTIONALITY TO ADD THE MD5 HASH for the data block.
             // ALSO CHECK FOR ANY FLAGS IF POSSIBLE
@@ -332,16 +312,9 @@ public class DataStoreGateway {
         } catch (IOException e){
             throw new Exception("Unable to close data-store file." + e.getMessage());
         }
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // INSERT CODE TO FIX THE EXTENTS
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // CREATE THE INODE ENTRY AND ALSO COMMUNICATE WITH THE INODESTORE.
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        return null;
+        return ExtentStoreGateway.ExtentFrame.getCompactExtentList(extentFramesLinkedList);
     }
-    public static byte[] getDefaultBytes() {
-        return new byte[11];
+    static byte[] getDefaultBytes() {
+        return new byte[DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_SIZE];
     }
 }
