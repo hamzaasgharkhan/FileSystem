@@ -1,0 +1,11 @@
+package Constants;
+
+public enum FILE_TYPES {
+    SUPER_BLOCK,
+    DIRECTORY_STORE,
+    EXTENT_STORE,
+    INODE_STORE,
+    METADATA_STORE,
+    THUMBNAIL_STORE,
+    DATA_STORE
+}
