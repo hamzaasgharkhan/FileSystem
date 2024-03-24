@@ -9,6 +9,7 @@ public class Main {
         try {
             fs = FileSystem.createFileSystem("Aqua File System");
 //             LS needs to be fixed.
+            fs.createDirectory("/", "Obama");
             fs.ls("/");
         } catch (Exception ex) {
             throw new RuntimeException(ex);

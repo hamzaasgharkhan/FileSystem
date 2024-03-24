@@ -5,6 +5,9 @@ import Constants.VALUES;
 import Utilities.BinaryUtilities;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.LinkedList;
 
 class ExtentStoreGateway {
@@ -96,17 +99,36 @@ class ExtentStoreGateway {
      * @param extentFrames LinkedList of target ExtentFrame objects
      * @return An array of two longs. The first element is the extentAddress of the entry and the second element is the
      * length of the extent entries.
+     * @throws Exception in case of IOErrors handling the extentStore file.
      */
-    public long[] addExtentEntry(LinkedList<ExtentFrame> extentFrames){
+    public long[] addExtentEntry(LinkedList<ExtentFrame> extentFrames) throws Exception{
+        // To access the extentStore file.
+        RandomAccessFile file;
+        // Create a new byte array to hold all the entries of the extentFrames LinkedList.
         byte[] byteArray = new byte[EXTENT_STORE_FRAME.SIZE * extentFrames.size()];
+        // Fill the byte array with the extent entries.
         for (int i = 0; i < extentFrames.size(); i++){
             __addExtentEntry(byteArray, extentFrames.get(i), i);
         }
+        // Get the appropriate index in the extentStore for the extent based on its size.
         long index = bitMapUtility.getFreeIndexExtentStore(extentFrames.size());
-
-        // IMPLEMENT
-//        ???????????????
-        return new long[]{};
+        try{
+            file = new RandomAccessFile(extentStoreFile, "rw");
+        } catch (FileNotFoundException e){
+            throw new Exception("Error opening extentStore file. File not found." + e.getMessage());
+        }
+        try{
+            file.seek(index * EXTENT_STORE_FRAME.SIZE);
+            file.write(byteArray);
+        } catch (IOException e){
+            throw new Exception("IOError occurred while accessing extentStore file." + e.getMessage());
+        }
+        try {
+            file.close();
+        } catch (IOException e){
+            throw new Exception("IOError occurred while closing extentStore file." + e.getMessage());
+        }
+        return new long[]{index, extentFrames.size()};
     }
 
     /**

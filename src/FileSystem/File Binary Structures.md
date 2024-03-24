@@ -20,20 +20,17 @@
     Size: 317 Bytes
     
 #### INode Entry
-    Magic Value                 -       4 bytes                                 || Starting Index: 0
-    iNodeAddress                -       8 bytes                                 || Starting Index: 4
-    parentINodeAddress          -       8 bytes                                 || Starting Index: 12
-    size                        -       8 bytes                                 || Starting Index: 20
-    flags                       -       1 byte                                  || Starting Index: 28
-    creationTime                -       8 bytes                                 || Starting Index: 29
-    lastModifiedTime            -       8 bytes                                 || Starting Index: 37
-    Magic Value                 -       4 bytes                                 || Starting Index: 45
+    md5 checksum                -       16 bytes                                || Starting Index: 0
+    iNodeAddress                -       8 bytes                                 || Starting Index: 16
+    size                        -       8 bytes                                 || Starting Index: 24
+    flags                       -       1 byte                                  || Starting Index: 32
+    creationTime                -       8 bytes                                 || Starting Index: 33
+    lastModifiedTime            -       8 bytes                                 || Starting Index: 41
     extentStoreAddress          -       8 bytes                                 || Starting Index: 49
     extentCount                 -       8 bytes                                 || Starting Index: 57
     thumbnailStoreAddress       -       8 bytes                                 || Starting Index: 65
-    Magic Value                 -       4 bytes                                 || Starting Index: 73
-    
-    Size: 77 bytes
+    attributeStoreAddress       -       8 bytes                                 || Starting Index: 73
+    Size: 81 bytes
 
 
 

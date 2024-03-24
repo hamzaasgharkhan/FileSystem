@@ -2,9 +2,6 @@ package FileSystem;
 
 import Exceptions.INodeNotFoundException;
 import Utilities.BinaryUtilities;
-import Utilities.GeneralUtilities;
-
-import java.nio.charset.StandardCharsets;
 
 /**
  * This class provides the logical representation for inodes.

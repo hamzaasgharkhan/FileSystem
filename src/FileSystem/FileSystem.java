@@ -95,6 +95,9 @@ public class FileSystem {
      * @return true if and only if the operation is successful.
      */
     public boolean addFile(File file){
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // MAKE A WAY TO FIND OUT WHERE THE FILE IS BEING ADDED. i.e. what is the parent node of the file.
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         try {
             INode inode = gateway.addFile(file);
         } catch (Exception e){

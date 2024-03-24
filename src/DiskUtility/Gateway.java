@@ -22,18 +22,19 @@ public class Gateway {
     private DirectoryStoreGateway directoryStoreGateway;
     private INodeStoreGateway iNodeStoreGateway;
     private ExtentStoreGateway extentStoreGateway;
+    private DataStoreGateway dataStoreGateway;
     private BitMapUtility bitMapUtility;
 
     public Gateway(SuperBlock superBlock, boolean firstCreation) throws Exception{
         this.superBlock = superBlock;
-        if (!firstCreation){
-            this.bitMapUtility = new BitMapUtility(superBlock.getFileSystemName());
-            this.directoryStoreGateway = new DirectoryStoreGateway(superBlock.getFileSystemName() + "/directory-store", bitMapUtility);
-            this.iNodeStoreGateway = new INodeStoreGateway(superBlock.getFileSystemName() + "/inode-store", bitMapUtility);
-            this.extentStoreGateway = new ExtentStoreGateway(superBlock.getFileSystemName() + "/extent-store", bitMapUtility);
-        } else {
+        if (firstCreation){
             initializeFileSystem();
         }
+        this.bitMapUtility = new BitMapUtility(superBlock.getFileSystemName());
+        this.directoryStoreGateway = new DirectoryStoreGateway(superBlock.getFileSystemName() + "/directory-store", bitMapUtility);
+        this.iNodeStoreGateway = new INodeStoreGateway(superBlock.getFileSystemName() + "/inode-store", bitMapUtility);
+        this.extentStoreGateway = new ExtentStoreGateway(superBlock.getFileSystemName() + "/extent-store", bitMapUtility);
+        this.dataStoreGateway = new DataStoreGateway(superBlock.getFileSystemName() + "/data-store", bitMapUtility);
     }
 
     public Gateway(SuperBlock superBlock) throws Exception{
@@ -55,10 +56,6 @@ public class Gateway {
             __createDataStoreFile();
             __createAttributeStoreFile();
             __createBitMapFiles();
-            bitMapUtility = new BitMapUtility(superBlock.getFileSystemName());
-            directoryStoreGateway = new DirectoryStoreGateway(superBlock.getFileSystemName() + "/directory-store", bitMapUtility);
-            iNodeStoreGateway = new INodeStoreGateway(superBlock.getFileSystemName() + "/inode-store", bitMapUtility);
-            extentStoreGateway = new ExtentStoreGateway(superBlock.getFileSystemName() + "/extent-store", bitMapUtility);
         } catch (Exception e) {
             throw new IOException("[Gateway] Unable to initialize FileSystem\n"+ e.getMessage());
         }
@@ -207,6 +204,8 @@ public class Gateway {
     //  Adding actual data files.
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     public INode addFile(File file) throws Exception{
+        long[] extentStoreDetails = extentStoreGateway.addExtentEntry(dataStoreGateway.addNode(file));
+        INode iNode = new INode();
         return iNodeStoreGateway.addNode(file);
     }
 }
