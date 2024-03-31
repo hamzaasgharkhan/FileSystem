@@ -31,9 +31,15 @@ public class NodeTree {
     /**
      * At the initialization of the NodeTree, a reference is created to the rootNode.
      */
-    public NodeTree(){
-        root = new Node("root", null,0, (byte)0b1000000);
+    public NodeTree(boolean mount){
         dirtyNodes = new LinkedList<Node>();
+        if (!mount){
+            root = new Node("root", null,-1, FLAGS.DEFAULT_DIRECTORY_FRAME_DIR);
+            dirtyNodes.add(root);
+        }
+    }
+    public NodeTree(){
+        this(false);
     }
     public Node getRoot() {
         return root;
@@ -94,6 +100,20 @@ public class NodeTree {
         Node node = new Node(name, parentNode, iNodeAddress, FLAGS.DEFAULT_NODE_FILE);
         node.parentNode = node;
         parentNode.childNodes.add(node);
+        dirtyNodes.add(node);
+        return node;
+    }
+
+    public Node addNode(Node parentNode, String name, long iNodeAddress) throws Exception{
+        _validNodeName(name);
+        if (!parentNode.isDirectory())
+            throw new IllegalArgumentException("Path does not point to a directory");
+        if (parentNode.getChildNode(name) != null)
+            throw new IllegalArgumentException("Node with the same name exists");
+        Node node = new Node(name, parentNode, iNodeAddress, FLAGS.DEFAULT_NODE_FILE);
+        node.parentNode = node;
+        parentNode.childNodes.add(node);
+        dirtyNodes.add(node);
         return node;
     }
 
@@ -108,6 +128,47 @@ public class NodeTree {
         return node;
     }
 
+    // DIRECTORY
+    public Node addNode(Node parentNode, String name) throws Exception{
+        _validNodeName(name);
+        Node node = new Node(name, parentNode);
+        parentNode.childNodes.add(node);
+        dirtyNodes.add(node);
+        return node;
+    }
+
+    /**
+     * This method takes a path. It either returns the node at that path if it exists, or creates the required nodes
+     * for the path before returning the Node object.
+     * @param path The required path
+     * @param gateway The DirectoryStoreGateway Object
+     * @return The Node object associated with the provided path.
+     */
+    public Node getOrCreatePath(String path, DirectoryStoreGateway gateway) throws Exception{
+        String[] nodes = path.split("/");
+        Node node = root;
+        // Control variable to loop over the nodes.
+        int i = 0;
+        // This block tries to go as deep as possible within the existing directory structure.
+        for (; i < nodes.length; i++){
+            if (nodes[i].isEmpty())
+                continue;
+            if (node.checkFlag(Node.CNR_FLAG_MASK))
+                gateway.readChildren(node);
+            Node childNode = node.getChildNode(nodes[i]);
+            if (childNode == null)
+                break;
+            node = childNode;
+        }
+        // In case the entire path is available within the directory structure, return the requisite node
+        if (i > nodes.length)
+            return node;
+        // In case the entire path is not available, create new nodes to fulfill the path requirement.
+        for (; i < nodes.length; i++){
+            node = addNode(node, nodes[i]);
+        }
+        return node;
+    }
     /**
      * Returns if and only if node name is valid. Otherwise, throws relevant exceptions.
      * @param name The node name to be tested.
@@ -156,5 +217,8 @@ public class NodeTree {
 
     public void setRoot(Node root) {
         this.root = root;
+    }
+    public LinkedList<Node> getDirtyNodes(){
+        return this.dirtyNodes;
     }
 }

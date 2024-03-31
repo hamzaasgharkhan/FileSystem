@@ -8,13 +8,14 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.file.Path;
 import java.util.LinkedList;
 
 class ExtentStoreGateway {
     private final BitMapUtility bitMapUtility;
     File extentStoreFile;
-    ExtentStoreGateway(String path, BitMapUtility bitMapUtility) throws Exception{
-        File file = new File(path);
+    ExtentStoreGateway(Path path, BitMapUtility bitMapUtility) throws Exception{
+        File file = path.resolve("extent-store").toFile();
         if (!file.exists())
             throw new Exception("Extent Store File Does Not Exist.");
         this.bitMapUtility = bitMapUtility;

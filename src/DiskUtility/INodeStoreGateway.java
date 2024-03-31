@@ -2,12 +2,16 @@ package DiskUtility;
 
 import Constants.INODE_FRAME;
 import Constants.VALUES;
-import Exceptions.INodeFileNotFoundException;
 import FileSystem.INode;
-import FileSystem.SuperBlock;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+
 
 /**
  * This class serves as a gateway between the iNodeStore File and the rest of the filesystem.
@@ -16,18 +20,58 @@ public class INodeStoreGateway {
     // Denotes the extentFrame
     File iNodeFile;
     final BitMapUtility bitMapUtility;
-    public INodeStoreGateway(String path, BitMapUtility bitMapUtility) throws Exception {
-        File file = new File(path);
+    public INodeStoreGateway(Path path, BitMapUtility bitMapUtility) throws Exception {
+        File file = path.resolve("inode-store").toFile();
         if (!file.exists())
             throw new Exception("Directory Store File Does Not Exist.");
         this.bitMapUtility = bitMapUtility;
         iNodeFile = file;
     }
 
-    public INode addNode(File file) throws Exception{
-
-        // IMPLEMENT
-        return null;
+    public INode addNode(Path path, long[] extentDetails, long thumbnailStoreAddress) throws Exception{
+        long creationTime;
+        long lastModifiedTime;
+        long iNodeAddress;
+        INode iNode;
+        RandomAccessFile fin;
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class);
+            creationTime = attributes.creationTime().toMillis();
+            lastModifiedTime = attributes.lastModifiedTime().toMillis();
+        } catch (IOException e){
+            throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
+        }
+        iNodeAddress = bitMapUtility.getFreeIndexINodeStore();
+        iNode = new INode();
+        iNode.setiNodeAddress(iNodeAddress);
+        iNode.setCreationTime(creationTime);
+        iNode.setLastModifiedTime(lastModifiedTime);
+        iNode.setExtentStoreAddress(extentDetails[0]);
+        iNode.setExtentCount(extentDetails[1]);
+        iNode.setThumbnailStoreAddress(thumbnailStoreAddress);
+        // ADD TO FILE
+        try {
+            fin = new RandomAccessFile(iNodeFile, "rw");
+        } catch (FileNotFoundException e){
+            throw new Exception("INODE_STORE File Not Found." + e.getMessage());
+        }
+        try {
+            fin.seek(iNodeAddress * INODE_FRAME.INODE_FRAME_SIZE);
+        } catch (IOException e){
+            throw new Exception("INODE_STORE Unable to seek. IOException thrown." + e.getMessage());
+        }
+        try{
+            fin.write(getINodeFrame(iNode));
+        } catch (IOException e){
+            throw new Exception("Unable to write new INODE_FRAME to the INODE_STORE." + e.getMessage());
+        }
+        try {
+            fin.close();
+        } catch (IOException e){
+            throw new Exception("Unable to close INODE_STORE file." + e.getMessage());
+        }
+        bitMapUtility.setIndexINodeStore(iNodeAddress, true);
+        return iNode;
     }
 
 
@@ -74,5 +118,9 @@ public class INodeStoreGateway {
         System.arraycopy(iNode.getFieldBytes("EXTENT_STORE_ADDRESS"), 0, byteArray, INODE_FRAME.EXTENT_STORE_ADDRESS_INDEX, 8);
         System.arraycopy(iNode.getFieldBytes("EXTENT_COUNT"), 0, byteArray, INODE_FRAME.EXTENT_COUNT_INDEX, 8);
         return byteArray;
+    }
+
+    public static byte[] getDefaultBytes(){
+        return new byte[0];
     }
 }

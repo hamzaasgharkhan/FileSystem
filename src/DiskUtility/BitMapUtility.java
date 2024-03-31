@@ -3,30 +3,34 @@ package DiskUtility;
 import Constants.DATA_STORE_BLOCK_FRAME;
 
 import javax.management.RuntimeMBeanException;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 
 /**
  * This class handles all the interactions between the filesystem and the bitmap files.
  */
 public class BitMapUtility {
-    private final String parentPath;
+    private final Path basePath;
     private byte[] directoryStoreBitMap;
     private byte[] extentStoreBitMap;
     private byte[] iNodeStoreBitMap;
     private byte[] dataStoreBitMap;
     private byte[] thumbnailStoreBitMap;
-    private byte[] attributeStoreBitMap;
-    BitMapUtility(String path) throws Exception{
-        parentPath = path;
-        __loadBitMaps(path);
+    BitMapUtility(Path path, boolean initialize) throws Exception{
+        basePath = path;
+        if (initialize)
+            __createBitmaps();
+        else
+            __loadBitMaps(path);
+    };
+    BitMapUtility(Path path) throws Exception{
+        this(path, false);
     };
     /**
      * This byte denotes whether a particular bitmap is dirty i.e. different from the version on disk.
-     * 0x00ATDIED
-     * A -> AttributeStore
+     * 0x000TDIED
      * T -> ThumbnailStore
      * D -> DataStore
      * I -> INodeStore
@@ -35,24 +39,70 @@ public class BitMapUtility {
      */
     private byte dirtyFlags = 0x00;
     /**
+     * This method creates and initializes bitmap files for the file system.
+     * @throws Exception In case an IOException arises with creating or writing to the files.
+     */
+    private void __createBitmaps() throws Exception{
+        String[] bitmapNames = {
+                // Singular Bitmaps
+                "directory-store.bitmap",
+                "extent-store.bitmap",
+                "inode-store.bitmap",
+                // Half Bitmaps
+                "data-store.bitmap",
+                "thumbnail-store.bitmap"
+        };
+        // Initializing Quarter Bitmaps
+        directoryStoreBitMap = __getEmptySingularBitmapBytes();
+        extentStoreBitMap = __getEmptySingularBitmapBytes();
+        iNodeStoreBitMap = __getEmptySingularBitmapBytes();
+        for (int i = 0; i < 3; i++){
+            try {
+                Files.write(basePath.resolve(bitmapNames[i]), directoryStoreBitMap);
+            } catch (IOException e){
+                throw new Exception("Error creating bitmap file: " + bitmapNames[i]);
+            }
+        }
+        // Initializing Half Bitmaps
+        dataStoreBitMap = __getEmptyHalfBitmap();
+        thumbnailStoreBitMap = __getEmptyHalfBitmap();
+        for (int i = 3; i < bitmapNames.length; i++){
+            try {
+                Files.write(basePath.resolve(bitmapNames[i]), dataStoreBitMap);
+            } catch (IOException e){
+                throw new Exception("Error creating bitmap file: " + bitmapNames[i]);
+            }
+        }
+    }
+
+    private byte[] __getEmptyHalfBitmap() {
+        byte[] halfBitmapBytes = new byte[2048];
+        Arrays.fill(halfBitmapBytes, (byte) 0b10001000);
+        return halfBitmapBytes;
+    }
+
+    private byte[] __getEmptySingularBitmapBytes() {
+        return new byte[1024];
+    }
+
+    /**
      * This method loads all the bitmap files from storage to memory.
      * @param path Path of the fileSystem.
      */
-    private void __loadBitMaps(String path) throws Exception{
+    private void __loadBitMaps(Path path) throws Exception{
         if (dirtyFlags != 0)
             throw new RuntimeException("Cannot Load Bitmaps from Storage. Dirty Bitmaps in memory need to be written to storage first");
-        byte[][] arrays = new byte[6][];
+        byte[][] arrays = new byte[5][];
         String[] paths = {
                 "directory-store.bitmap",
                 "extent-store.bitmap",
                 "inode-store.bitmap",
                 "data-store.bitmap",
                 "thumbnail-store.bitmap",
-                "attribute-store.bitmap"
         };
         for (int i = 0; i < arrays.length; i++){
             try {
-                FileInputStream fin = new FileInputStream(path + "/" + paths[0]);
+                FileInputStream fin = new FileInputStream(path.resolve(paths[0]).toFile());
                 arrays[i] = fin.readAllBytes();
                 fin.close();
             } catch (FileNotFoundException e) {
@@ -66,45 +116,97 @@ public class BitMapUtility {
         iNodeStoreBitMap = arrays[2];
         dataStoreBitMap = arrays[3];
         thumbnailStoreBitMap = arrays[4];
-        attributeStoreBitMap = arrays[5];
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // DIRECTORY_STORE METHODS
+    // Singular BITMAP METHODS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public long getFreeIndexDirectoryStore(){
-        for (int i = 0; i < directoryStoreBitMap.length; i++) {
-            if ((byte) directoryStoreBitMap[i] == -1)
+    protected long getFreeIndexSingularBitmap(String storeName){
+        byte[] bitmap = switch (storeName) {
+            case "DIRECTORY_STORE" -> directoryStoreBitMap;
+            case "EXTENT_STORE" -> extentStoreBitMap;
+            case "INODE_STORE" -> iNodeStoreBitMap;
+            default -> throw new RuntimeException("Invalid Store Name for Quarter Bitmap");
+        };
+        for (int i = 0; i < bitmap.length; i++){
+            // All indices are allocated
+            if (bitmap[i] == -1)
                 continue;
             else {
-                int bitIndex = -1;
-                for (int j = 7; j >= 0; j--) {
-                    if (((directoryStoreBitMap[i] >> j) & 1) == 0) {
+                int bitIndex;
+                for (int j = 7; j > -1; j--) {
+                    if (((bitmap[i] >> j) & 1) == 0) {
                         bitIndex = 7 - j;
-                        break;
+                        return i + bitIndex;
                     }
                 }
-                return i + bitIndex;
             }
         }
-        // IF CODE REACHES THIS POINT, THERE IS NO FREE BLOCK in the byte array. need to assign more blocks.
-        int ind = directoryStoreBitMap.length;
-        byte[] arr = new byte[ind + 16];
-        System.arraycopy(directoryStoreBitMap, 0, arr, 0, ind);
-        directoryStoreBitMap = arr;
-        setDirtyFlag("DIRECTORY_STORE");
-        writeToFile("DIRECTORY_STORE");
-        return ind * 8L;
+        // In case no free index exists, allocate more indices to the bitmap and return the first index in the newly
+        // allocated indices.
+        int length = bitmap.length;
+        byte[] arr = new byte[length + 1024];
+        System.arraycopy(bitmap, 0, arr, 0, length);
+        switch (storeName) {
+            case "DIRECTORY_STORE" -> directoryStoreBitMap = arr;
+            case "EXTENT_STORE" -> extentStoreBitMap = arr;
+            case "INODE_STORE" -> iNodeStoreBitMap = arr;
+            default -> throw new RuntimeException("THIS CODE SHOULD NOT EXECUTE");
+        };
+        setDirtyFlag(storeName);
+        writeToFile(storeName);
+        return length * 8L;
     }
-    public void toggleIndexDirectoryStore(long index){
-        int byteIndex = (int) (index / 8L);
-        int bitIndex = (int) (index % 8L);
-        byte requiredByte = directoryStoreBitMap[byteIndex];
-        requiredByte = (byte)(requiredByte ^ (0x01 << 7-bitIndex));
-        directoryStoreBitMap[byteIndex] = requiredByte;
-        setDirtyFlag("DIRECTORY_STORE");
-        writeToFile("DIRECTORY_STORE");
+
+    public void setIndexSingularBitmap(String storeName, long index, boolean value){
+        byte[] bitmap = switch (storeName) {
+            case "DIRECTORY_STORE" -> directoryStoreBitMap;
+            case "EXTENT_STORE" -> extentStoreBitMap;
+            case "INODE_STORE" -> iNodeStoreBitMap;
+            default -> throw new RuntimeException("Invalid Store Name for Quarter Bitmap");
+        };
+        if (index > bitmap.length)
+            throw new IndexOutOfBoundsException("Invalid Index For Bitmap");
+        int byteIndex = (int)(index / 8L);
+        int bitIndex = (int)(index % 8L);
+        byte targetByte = bitmap[byteIndex];
+        if (value)
+            targetByte = (byte)(targetByte | (0x01 << 7 - bitIndex));
+        else
+            targetByte = (byte)(targetByte & ~(0x01 << 7 - bitIndex));
+        bitmap[byteIndex] = targetByte;
+        setDirtyFlag(storeName);
+        writeToFile(storeName, index);
     }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // AUXILIARY METHODS
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    protected long getFreeIndexDirectoryStore(){
+        return getFreeIndexSingularBitmap("DIRECTORY_STORE");
+    }
+
+    protected void setIndexDirectoryStore(long index, boolean value){
+        setIndexSingularBitmap("DIRECTORY_STORE", index, value);
+    }
+
+    protected long getFreeIndexExtentStore(){
+        return getFreeIndexSingularBitmap("EXTENT_STORE");
+    }
+
+    protected void setIndexExtentStore(long index, boolean value){
+        setIndexSingularBitmap("EXTENT_STORE", index, value);
+    }
+
+    protected long getFreeIndexINodeStore(){
+        return getFreeIndexSingularBitmap("INODE_STORE");
+    }
+
+    protected void setIndexINodeStore(long index, boolean value){
+        setIndexSingularBitmap("INODE_STORE", index, value);
+    }
+
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // DATA_STORE METHODS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,7 +297,6 @@ public class BitMapUtility {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // EXTENT_STORE METHODS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
     /**
      * Returns free extent index that can hold consecutive extent entries
      * @param totalEntries Number of consecutive entries / extent blocks needed
@@ -243,26 +344,6 @@ public class BitMapUtility {
         else
             return firstIndex;
     }
-    /**
-     * Checks whether a block with the given index exists on disk or not.
-     * @param index The index of the target block.
-     * @return true if and only if the block has been allocated on disk.
-     */
-    public boolean isExtentStoreIndexAllocated(long index, int totalEntries){
-        // NEEDS TO BE FIXED. Should return with respect to the last index of the entries. index + totalEntries
-        int byteIndex = (int) (index / 4L);
-        int bitIndex = (int) (index % 4L);
-        byte requiredByte = dataStoreBitMap[byteIndex];
-        return (((byte)(requiredByte >> 2 * (4 - bitIndex))) & 0b00000010) == 0;
-    }
-
-    /**
-     * @return index of the last allocated extent.
-     */
-    public long extentStoreGetLastAllocated(){
-        // IMPLEMENT
-        return 0;
-    }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // FILE UTILITIES
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,15 +370,49 @@ public class BitMapUtility {
                 byteArr = thumbnailStoreBitMap;
                 yield "thumbnail-store.bitmap";
             }
-            case "ATTRIBUTE_STORE" -> {
-                byteArr = attributeStoreBitMap;
-                yield "attribute-store.bitmap";
+            default -> throw new IllegalArgumentException("Invalid Store Name");
+        };
+        try {
+            FileOutputStream fout = new FileOutputStream(basePath.resolve(filename).toFile());
+            fout.write(byteArr);
+            fout.close();
+        } catch (FileNotFoundException e){
+            throw new RuntimeException("Unexpected Error Occurred. Bitmap File Not Found." + e.getMessage());
+        } catch (IOException e){
+            throw new RuntimeException("Unexpected Error Occurred. Unable to write to bitmap file." + e.getMessage());
+        }
+        resetDirtyFlag(storeName);
+    }
+
+    public void writeToFile(String storeName, long index){
+        byte[] byteArr;
+        String filename = switch (storeName) {
+            case "DIRECTORY_STORE" -> {
+                byteArr = directoryStoreBitMap;
+                yield "directory-store.bitmap";
+            }
+            case "EXTENT_STORE" -> {
+                byteArr = extentStoreBitMap;
+                yield "directory-store.bitmap";
+            }
+            case "INODE_STORE" -> {
+                byteArr = iNodeStoreBitMap;
+                yield "directory-store.bitmap";
+            }
+            case "DATA_STORE" -> {
+                byteArr = dataStoreBitMap;
+                yield "data-store.bitmap";
+            }
+            case "THUMBNAIL_STORE" -> {
+                byteArr = thumbnailStoreBitMap;
+                yield "thumbnail-store.bitmap";
             }
             default -> throw new IllegalArgumentException("Invalid Store Name");
         };
         try {
-            FileOutputStream fout = new FileOutputStream(parentPath + "/" + filename);
-            fout.write(byteArr);
+            RandomAccessFile fout = new RandomAccessFile(basePath.resolve(filename).toFile(), "rw");
+            fout.seek(index);
+            fout.write(byteArr[(int)index]);
             fout.close();
         } catch (FileNotFoundException e){
             throw new RuntimeException("Unexpected Error Occurred. Bitmap File Not Found." + e.getMessage());
@@ -333,9 +448,6 @@ public class BitMapUtility {
             case "THUMBNAIL_STORE":
                 dirtyFlags = (byte)(dirtyFlags | 0b00010000);
                 break;
-            case "ATTRIBUTE_STORE":
-                dirtyFlags = (byte)(dirtyFlags | 0b00100000);
-                break;
             default:
                 throw new RuntimeException("Invalid Store Name");
         }
@@ -358,9 +470,6 @@ public class BitMapUtility {
             case "THUMBNAIL_STORE":
                 dirtyFlags = (byte)(dirtyFlags & ~0b00010000);
                 break;
-            case "ATTRIBUTE_STORE":
-                dirtyFlags = (byte)(dirtyFlags & ~0b00100000);
-                break;
             default:
                 throw new RuntimeException("Invalid Store Name");
         }
@@ -372,7 +481,6 @@ public class BitMapUtility {
             case "INODE_STORE" -> (dirtyFlags & 0b00000100) != 0;
             case "DATA_STORE" -> (dirtyFlags & 0b00001000) != 0;
             case "THUMBNAIL_STORE" -> (dirtyFlags & 0b00010000) != 0;
-            case "ATTRIBUTE_STORE" -> (dirtyFlags & 0b00100000) != 0;
             default -> throw new RuntimeException("Invalid Store Name");
         };
     }

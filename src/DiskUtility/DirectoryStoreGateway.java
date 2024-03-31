@@ -15,6 +15,7 @@ import FileSystem.NodeTree;
 import Utilities.BinaryUtilities;
 import Utilities.GeneralUtilities;
 import java.io.*;
+import java.nio.file.Path;
 import java.util.LinkedList;
 /**
  * This class provides an interface between the DirectoryStore file and the rest of the filesystem.
@@ -83,8 +84,8 @@ public class DirectoryStoreGateway{
     }
     File directoryStoreFile;
     final BitMapUtility bitMapUtility;
-    public DirectoryStoreGateway(String path, BitMapUtility bitMapUtility) throws Exception {
-        File file = new File(path);
+    public DirectoryStoreGateway(Path path, BitMapUtility bitMapUtility) throws Exception {
+        File file = path.resolve("directory-store").toFile();
         if (!file.exists())
             throw new Exception("Directory Store File Does Not Exist.");
         directoryStoreFile = file;
@@ -99,7 +100,7 @@ public class DirectoryStoreGateway{
      * @return NodeTree object containing the rote node.
      */
     public NodeTree mount() throws Exception {
-        NodeTree nodeTree = new NodeTree();
+        NodeTree nodeTree = new NodeTree(true);
         DirectoryFrame rootFrame = getDirectoryFrame(0);
         Node root = new Node(rootFrame.name, null, 0, rootFrame.flags);
         nodeTree.setRoot(root);
@@ -173,6 +174,8 @@ public class DirectoryStoreGateway{
      * @throws Exception In case the node is not successfully added to the directory-store.
      */
     public long addNode(Node node) throws Exception{
+        if (node.getName().equals("root"))
+            return __addRootNode(node);
         Node parentNode = node.getParentNode();
         LinkedList<Node> siblings = parentNode.getChildNodes();
         int siblingsSize = siblings.size();
@@ -183,8 +186,8 @@ public class DirectoryStoreGateway{
                 parentNode.getIndex(),
                 node.getiNodeAddress(),
                 parentNode.getiNodeAddress(),
-                -1,
-                -1,
+                index,
+                index,
                 index,
                 FLAGS.DEFAULT_DIRECTORY_FRAME_DIR
         );
@@ -199,8 +202,8 @@ public class DirectoryStoreGateway{
             int selfIndex = siblings.indexOf(node);
             DirectoryFrame previousSibling = null;
             DirectoryFrame nextSibling = null;
-            int nextIndex = (selfIndex == 0) ? 0: 1;
-            previousSibling = getDirectoryFrame(nextIndex);
+            int nextIndex = (selfIndex == 0) ? 1: 0;
+            previousSibling = getDirectoryFrame(siblings.get(nextIndex).getIndex());
             if (previousSibling.previousSiblingIndex == previousSibling.index){ // There is only 1 sibling.
                 previousSibling.previousSiblingIndex = index;
                 previousSibling.nextSiblingIndex = index;
@@ -218,7 +221,26 @@ public class DirectoryStoreGateway{
             }
         }
         __writeDirectoryFrame(frame, index);
-        bitMapUtility.toggleIndexDirectoryStore(index);
+        bitMapUtility.setIndexDirectoryStore(index, true);
+        node.setIndex(index);
+        return index;
+    }
+
+    private long __addRootNode(Node node) throws Exception{
+        long index = bitMapUtility.getFreeIndexDirectoryStore();
+        DirectoryFrame frame = new DirectoryFrame(
+                node.getName(),
+                index,
+                index,
+                0,
+                0,
+                index,
+                index,
+                index,
+                FLAGS.DEFAULT_DIRECTORY_FRAME_DIR
+        );
+        __writeDirectoryFrame(frame, index);
+        bitMapUtility.setIndexDirectoryStore(index, true);
         node.setIndex(index);
         return index;
     }

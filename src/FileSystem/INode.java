@@ -2,6 +2,7 @@ package FileSystem;
 
 import Exceptions.INodeNotFoundException;
 import Utilities.BinaryUtilities;
+import Constants.FLAGS;
 
 /**
  * This class provides the logical representation for inodes.
@@ -14,22 +15,20 @@ import Utilities.BinaryUtilities;
  * extentCount          :   Contains the number of extent pointers.
  *
  *
- * Magic Value                 -       4 bytes                                 || Starting Index: 0
- *     iNodeAddress                -       8 bytes                                 || Starting Index: 4
- *     parentINodeAddress          -       8 bytes                                 || Starting Index: 12
- *     size                        -       8 bytes                                 || Starting Index: 20
- *     flags                       -       1 byte                                  || Starting Index: 28
- *     creationTime                -       8 bytes                                 || Starting Index: 29
- *     lastModifiedTime            -       8 bytes                                 || Starting Index: 37
- *     Magic Value                 -       4 bytes                                 || Starting Index: 45
- *     extentStoreAddress          -       8 bytes                                 || Starting Index: 49
- *     extentCount                 -       8 bytes                                 || Starting Index: 57
- *     thumbnailStoreAddress       -       8 bytes                                 || Starting Index: 65
- *     Magic Value
+ md5 checksum                -       16 bytes                                || Starting Index: 0
+ iNodeAddress                -       8 bytes                                 || Starting Index: 16
+ size                        -       8 bytes                                 || Starting Index: 24
+ flags                       -       1 byte                                  || Starting Index: 32
+ creationTime                -       8 bytes                                 || Starting Index: 33
+ lastModifiedTime            -       8 bytes                                 || Starting Index: 41
+ extentStoreAddress          -       8 bytes                                 || Starting Index: 49
+ extentCount                 -       8 bytes                                 || Starting Index: 57
+ thumbnailStoreAddress       -       8 bytes                                 || Starting Index: 65
+ Size: 73 bytes
+
  */
 public class INode {
     private long iNodeAddress;
-    private long parentINodeAddress;
     private long iNodeSize;
     private byte flags;
     private long creationTime;
@@ -37,28 +36,11 @@ public class INode {
     private long extentStoreAddress;
     private long extentCount;
     private long thumbnailStoreAddress;
+
     public INode(){
-
+        this.flags = FLAGS.DEFAULT_INODE;
     }
 
-    /**
-     * This method checks the flags to determine whether the calling iNode is a directory.
-     * @return true if the calling iNode is a directory.
-     */
-    public boolean isDirectory(){
-        // IMPLEMENT LATER
-        return true;
-    }
-    /**
-     * This static method takes an iNodeAddress and retrieves the iNode from the iNodeStore on disk.
-     * @param iNodeAddress The address of the requested iNode
-     * @return The requested iNode
-     * @throws INodeNotFoundException Throws an exception in case of an invalid iNode Address.
-     */
-    public static INode getINode(long iNodeAddress){
-        // IMPLEMENT LATER
-        return null;
-    }
     /**
      * This method returns the byte Array representation of any field of the SuperBlock
      * @param field The name of the field. Can be one of the following:
@@ -76,7 +58,6 @@ public class INode {
     public byte[] getFieldBytes(String field){
         return switch (field) {
             case "INODE_ADDRESS" -> BinaryUtilities.convertLongToBytes(iNodeAddress);
-            case "PARENT_INODE_ADDRESS" -> BinaryUtilities.convertLongToBytes(parentINodeAddress);
             case "SIZE" -> BinaryUtilities.convertLongToBytes(iNodeSize);
             case "FLAGS" -> new byte[]{flags};
             case "CREATION_TIME" -> BinaryUtilities.convertLongToBytes(creationTime);
@@ -87,4 +68,69 @@ public class INode {
             default -> throw new IllegalArgumentException("No such field exists");
         };
     }
+
+    public long getiNodeAddress() {
+        return iNodeAddress;
+    }
+
+    public void setiNodeAddress(long iNodeAddress) {
+        this.iNodeAddress = iNodeAddress;
+    }
+
+    public long getiNodeSize() {
+        return iNodeSize;
+    }
+
+    public void setiNodeSize(long iNodeSize) {
+        this.iNodeSize = iNodeSize;
+    }
+
+    public byte getFlags() {
+        return flags;
+    }
+
+    public void setFlags(byte flags) {
+        this.flags = flags;
+    }
+
+    public long getCreationTime() {
+        return creationTime;
+    }
+
+    public void setCreationTime(long creationTime) {
+        this.creationTime = creationTime;
+    }
+
+    public long getLastModifiedTime() {
+        return lastModifiedTime;
+    }
+
+    public void setLastModifiedTime(long lastModifiedTime) {
+        this.lastModifiedTime = lastModifiedTime;
+    }
+
+    public long getExtentStoreAddress() {
+        return extentStoreAddress;
+    }
+
+    public void setExtentStoreAddress(long extentStoreAddress) {
+        this.extentStoreAddress = extentStoreAddress;
+    }
+
+    public long getExtentCount() {
+        return extentCount;
+    }
+
+    public void setExtentCount(long extentCount) {
+        this.extentCount = extentCount;
+    }
+
+    public long getThumbnailStoreAddress() {
+        return thumbnailStoreAddress;
+    }
+
+    public void setThumbnailStoreAddress(long thumbnailStoreAddress) {
+        this.thumbnailStoreAddress = thumbnailStoreAddress;
+    }
+
 }

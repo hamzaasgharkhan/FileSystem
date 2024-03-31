@@ -5,6 +5,7 @@ import Utilities.BinaryUtilities;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.AbstractQueue;
 import java.util.LinkedList;
 
@@ -159,8 +160,8 @@ class DataStoreGateway {
     }
     File dataStoreFile;
     final BitMapUtility bitMapUtility;
-    DataStoreGateway(String path, BitMapUtility bitMapUtility) throws Exception {
-        File file = new File(path);
+    DataStoreGateway(Path path, BitMapUtility bitMapUtility) throws Exception {
+        File file = path.resolve("data-store").toFile();
         if (!file.exists())
             throw new Exception("Directory Store File Does Not Exist.");
         this.bitMapUtility = bitMapUtility;
@@ -315,6 +316,6 @@ class DataStoreGateway {
         return ExtentStoreGateway.ExtentFrame.getCompactExtentList(extentFramesLinkedList);
     }
     static byte[] getDefaultBytes() {
-        return new byte[DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_SIZE];
+        return new byte[0];
     }
 }

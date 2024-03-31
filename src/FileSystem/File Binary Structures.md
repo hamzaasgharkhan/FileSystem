@@ -29,8 +29,7 @@
     extentStoreAddress          -       8 bytes                                 || Starting Index: 49
     extentCount                 -       8 bytes                                 || Starting Index: 57
     thumbnailStoreAddress       -       8 bytes                                 || Starting Index: 65
-    attributeStoreAddress       -       8 bytes                                 || Starting Index: 73
-    Size: 81 bytes
+    Size: 73 bytes
 
 
 
@@ -57,6 +56,17 @@
     Length                      -       4 bytes                                 || Starting Index: 16 
 
     Size: 20 Bytes
+
+#### Modified ExtentStore Entry
+    Magic Value                 -       4 bytes                                 || Starting Index: 0
+    Extent Address              -       8 bytes                                 || Starting Index: 4
+    DataStore Index             -       8 bytes                                 || Starting Index: 12
+    DataStore Offset            -       4 bytes                                 || Starting Index: 20
+    Length                      -       8 bytes                                 || Starting Index: 24
+    Next Extent Frame           -       8 bytes                                 || Starting Index: 32
+
+    Size: 40 bytes
+    
 
 #### DataStore Block
     MD5 hash                    -      16 bytes                                 || Starting Index: 0

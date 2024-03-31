@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 /**
  * Gateway provides the basic initialization operations that the FileSystem requires.
@@ -19,43 +20,42 @@ import java.nio.file.Paths;
  */
 public class Gateway {
     private final SuperBlock superBlock;
-    private DirectoryStoreGateway directoryStoreGateway;
-    private INodeStoreGateway iNodeStoreGateway;
-    private ExtentStoreGateway extentStoreGateway;
-    private DataStoreGateway dataStoreGateway;
-    private BitMapUtility bitMapUtility;
+    private final DirectoryStoreGateway directoryStoreGateway;
+    private final INodeStoreGateway iNodeStoreGateway;
+    private final ExtentStoreGateway extentStoreGateway;
+    private final DataStoreGateway dataStoreGateway;
+    private final ThumbnailStoreGateway thumbnailStoreGateway;
+    private final BitMapUtility bitMapUtility;
+    private final Path basePath;
 
-    public Gateway(SuperBlock superBlock, boolean firstCreation) throws Exception{
+    public Gateway(Path basePath, SuperBlock superBlock, boolean firstCreation) throws Exception{
         this.superBlock = superBlock;
+        this.basePath = basePath;
         if (firstCreation){
             initializeFileSystem();
+            this.bitMapUtility = new BitMapUtility(basePath, true);
+        } else {
+            this.bitMapUtility = new BitMapUtility(basePath);
         }
-        this.bitMapUtility = new BitMapUtility(superBlock.getFileSystemName());
-        this.directoryStoreGateway = new DirectoryStoreGateway(superBlock.getFileSystemName() + "/directory-store", bitMapUtility);
-        this.iNodeStoreGateway = new INodeStoreGateway(superBlock.getFileSystemName() + "/inode-store", bitMapUtility);
-        this.extentStoreGateway = new ExtentStoreGateway(superBlock.getFileSystemName() + "/extent-store", bitMapUtility);
-        this.dataStoreGateway = new DataStoreGateway(superBlock.getFileSystemName() + "/data-store", bitMapUtility);
+        this.directoryStoreGateway = new DirectoryStoreGateway(basePath, bitMapUtility);
+        this.iNodeStoreGateway = new INodeStoreGateway(basePath, bitMapUtility);
+        this.extentStoreGateway = new ExtentStoreGateway(basePath, bitMapUtility);
+        this.dataStoreGateway = new DataStoreGateway(basePath, bitMapUtility);
+        this.thumbnailStoreGateway = new ThumbnailStoreGateway(basePath, bitMapUtility);
     }
 
-    public Gateway(SuperBlock superBlock) throws Exception{
-        this(superBlock, false);
+    public Gateway(Path path, SuperBlock superBlock) throws Exception{
+        this(path,  superBlock, false);
     }
 
     /**
      * This method initializes the directory for the FileSystem and creates all the necessary files.
      */
-    private void initializeFileSystem() throws Exception{
-        Path basePath = Paths.get(superBlock.getFileSystemName());
+    protected void initializeFileSystem() throws Exception{
         try {
             Files.createDirectory(basePath);
             __createSuperBlockFile();
-            __createDirectoryStoreFile();
-            __createExtentStoreFile();
-            __createINodeStoreFile();
-            __createThumbnailStoreFile();
-            __createDataStoreFile();
-            __createAttributeStoreFile();
-            __createBitMapFiles();
+            __createStores();
         } catch (Exception e) {
             throw new IOException("[Gateway] Unable to initialize FileSystem\n"+ e.getMessage());
         }
@@ -67,8 +67,8 @@ public class Gateway {
      * @param path Path of the root directory of the FileSystem
      * @return FileSystem object containing the FileSystem at the provided path.
      */
-    public static FileSystem mountFileSystem(FileSystem fs, String path) throws Exception {
-        File file = new File(path);
+    public static FileSystem mountFileSystem(FileSystem fs, Path path) throws Exception {
+        File file = path.toFile();
         if (!file.exists() || !file.isDirectory())
             throw new IllegalArgumentException("Invalid Path.");
         File superBlockFile = new File(path + "/super-block");
@@ -76,105 +76,30 @@ public class Gateway {
             throw new Exception("SuperBlock File Does Not Exist.");
         SuperBlock superBlock = SuperBlockGateway.getSuperBlock(path);
         fs.setSuperBlock(superBlock);
-        fs.setGateway(new Gateway(superBlock));
+        fs.setGateway(new Gateway(path, superBlock));
         fs.setDir(fs.getGateway().directoryStoreGateway.mount());
         return fs;
     }
 
-    private void __createBitMapFiles() throws IOException {
-        String prefix = superBlock.getFileSystemName() + "/";
-        String[] paths = {
-                "extent-store.bitmap",
-                "inode-store.bitmap",
+    private void __createStores() throws Exception{
+        // Directory store is not added to this list as it will not be empty.
+        String[] storeNames = {
+                "extent-store",
+                "inode-store",
+                "data-store",
+                "thumbnail-store"
         };
-        try {
-            for (String name: paths) {
-                Path path = Paths.get(prefix + name);
-                Files.createFile(path);
+        for (String storeName: storeNames){
+            try {
+                Files.createFile(basePath.resolve(storeName));
+            } catch (IOException e){
+                throw new Exception("Error Initializing File System Store: " + storeName);
             }
-            // Set Directory Bitmap to have 1 slot taken to represent root.
-            Path path = Paths.get(prefix + "directory-store.bitmap");
-            byte[] blockArray = new byte[16];
-            blockArray[0] = (byte) 0b10000000;
-            Files.write(path, blockArray);
-            // Set AttributeStore Bitmap to empty
-            path = Paths.get(prefix + "attribute-store.bitmap");
-            blockArray[0] = 0x00;
-            Files.write(path, blockArray);
-            // Set DataStore Bitmap to empty
-            path = Paths.get(prefix + "data-store.bitmap");
-            blockArray = new byte[]{(byte)0b10001001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
-                    (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
-                    (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
-                    (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001};
-            Files.write(path, blockArray);
-            // Set ThumbnailStore Bitmap to empty
-            path = Paths.get(prefix + "thumbnail-store.bitmap");
-            Files.write(path, blockArray);
-            // Set ExtentStore Bitmap to empty
-            path = Paths.get(prefix + "extent-store.bitmap");
-            blockArray = new byte[]{(byte)0b00000000, (byte)0b00000000, (byte)0b00000000, (byte)0b00000000};
-            Files.write(path, blockArray);
-        } catch (IOException e){
-            throw new IOException("[Gateway] __createBitMapFiles Failed.\n" + e.getMessage());
         }
-    }
-
-    private void __createThumbnailStoreFile() throws IOException {
-        Path path = Paths.get(superBlock.getFileSystemName() + "/thumbnail-store");
-        byte[] blockArray = ThumbnailStoreGateway.getDefaultBytes();
         try {
-            Files.write(path, blockArray);
+            Files.write(basePath.resolve("directory-store"), DirectoryStoreGateway.getDefaultBytes());
         } catch (IOException e){
-            throw new IOException("[Gateway] __createThumbnailStoreFileFailed failed.\n" + e.getMessage());
-        }
-    }
-
-    private void __createINodeStoreFile() throws IOException{
-        Path path = Paths.get(superBlock.getFileSystemName() + "/inode-store");
-        try {
-            Files.createFile(path);
-        } catch (IOException e){
-            throw new IOException("[Gateway] __createINodeStoreFileFailed failed.\n" + e.getMessage());
-        }
-    }
-
-    private void __createAttributeStoreFile() throws IOException{
-        Path path = Paths.get(superBlock.getFileSystemName() + "/attribute-store");
-        try {
-            Files.createFile(path);
-        } catch (IOException e){
-            throw new IOException("[Gateway] __createAttributeStoreFileFailed failed.\n" + e.getMessage());
-        }
-    }
-
-    private void __createExtentStoreFile() throws IOException {
-        Path path = Paths.get(superBlock.getFileSystemName() + "/extent-store");
-        byte[] blockArray = ExtentStoreGateway.getDefaultBytes();
-        try {
-            Files.write(path, blockArray);
-        } catch (IOException e){
-            throw new IOException("[Gateway] __createExtentStoreFileFailed failed.\n" + e.getMessage());
-        }
-    }
-
-    private void __createDirectoryStoreFile() throws IOException{
-        Path path = Paths.get(superBlock.getFileSystemName() + "/directory-store");
-        byte[] blockArray = DirectoryStoreGateway.getDefaultBytes();
-        try {
-            Files.write(path, blockArray);
-        } catch (IOException e){
-            throw new IOException("[Gateway] __createDirectoryStoreFileFailed failed.\n" + e.getMessage());
-        }
-    }
-
-    private void __createDataStoreFile() throws IOException{
-        Path path = Paths.get(superBlock.getFileSystemName() + "/data-store");
-        byte[] blockArray = DataStoreGateway.getDefaultBytes();
-        try {
-            Files.write(path, blockArray);
-        } catch (IOException e){
-            throw new IOException("[Gateway] __createDataStoreFileFailed failed.\n" + e.getMessage());
+            throw new Exception("Error Initializing File System Store: directory-store");
         }
     }
 
@@ -203,9 +128,10 @@ public class Gateway {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //  Adding actual data files.
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public INode addFile(File file) throws Exception{
+    public INode addFile(Path path) throws Exception{
+        File file = path.toFile();
         long[] extentStoreDetails = extentStoreGateway.addExtentEntry(dataStoreGateway.addNode(file));
-        INode iNode = new INode();
-        return iNodeStoreGateway.addNode(file);
+        long thumbnailStoreAddress = thumbnailStoreGateway.addNode(path);
+        return iNodeStoreGateway.addNode(path, extentStoreDetails, thumbnailStoreAddress);
     }
 }

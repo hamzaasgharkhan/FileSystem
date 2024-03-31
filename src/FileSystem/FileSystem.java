@@ -1,12 +1,10 @@
 package FileSystem;
 import Constants.FLAGS;
-import Constants.PRESET_FILE_NAMES;
 import DiskUtility.*;
 import Exceptions.*;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.nio.file.Path;
 import java.util.LinkedList;
 
 /**
@@ -29,14 +27,16 @@ public class FileSystem {
      * It will also call the init function to create all the requisite data structures and files.
      * @return A FileSystem instance
      */
-    public static FileSystem createFileSystem(String fileSystemName) throws FileSystemCreationFailedException {
+    public static FileSystem createFileSystem(Path path, String fileSystemName) throws Exception {
         FileSystem fs = new FileSystem();
         fs.superBlock = new SuperBlock(fileSystemName);
+        path = path.resolve(fileSystemName);
         try{
-            fs.gateway = new Gateway(fs.superBlock, true);
-            fs.dir = fs.gateway.getDirectoryStoreGateway().mount();
+            fs.gateway = new Gateway(path, fs.superBlock, true);
+            fs.dir = new NodeTree();
+            fs.gateway.addNode(fs.dir.getDirtyNodes().pop());
         } catch (Exception e){
-            throw new FileSystemCreationFailedException("FileSystem Creation Failed.\n" + e.getMessage());
+            throw new Exception("FileSystem Creation Failed.\n" + e.getMessage());
         }
         return fs;
     }
@@ -46,7 +46,7 @@ public class FileSystem {
      * fields of the FileSystem.
      * @return true if and only if the init method was successful.
      */
-    public static FileSystem mount(String path) throws Exception{
+    public static FileSystem mount(Path path) throws Exception{
         return Gateway.mountFileSystem(new FileSystem(), path);
     }
 
@@ -58,14 +58,14 @@ public class FileSystem {
      */
     public void createDirectory(String path, String name) throws Exception{
         try {
-            Node node = dir.addNode(path, name, gateway.getDirectoryStoreGateway());
-            gateway.addNode(node);
+            dir.addNode(path, name, gateway.getDirectoryStoreGateway());
+            __writeDirtyNodes();
         } catch (IllegalArgumentException e){
             throw new IllegalArgumentException("Unable to create directory." + e.getMessage());
         }
     }
 
-    public void ls(String path){
+    public void ls(String path) throws Exception{
         try {
             LinkedList<Node> nodes = dir.ls(path, gateway.getDirectoryStoreGateway());
             if (nodes == null)
@@ -74,7 +74,7 @@ public class FileSystem {
                 System.out.println(node.getName());
             }
         } catch (Exception e){
-            throw new RuntimeException(e.getMessage());
+            throw new Exception(e.getMessage());
         }
     }
     /**
@@ -91,28 +91,37 @@ public class FileSystem {
      * This method imports a file from another filesystem to the specified path if the path exists.
      * This method does not deal with directories. A wrapper will need to be provided to distinguish between adding
      * directories and files.
-     * @param file  The File to be added.
+     * @param path  the path to the file.
      * @return true if and only if the operation is successful.
      */
-    public boolean addFile(File file){
+    public void addFile(Path path) throws Exception{
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // MAKE A WAY TO FIND OUT WHERE THE FILE IS BEING ADDED. i.e. what is the parent node of the file.
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        try {
-            INode inode = gateway.addFile(file);
-        } catch (Exception e){
-            throw new RuntimeException(e.getMessage());
-        }
         /*
         STEPS:
-
-            -> Create an inode entry.
             -> Place the data in the data-store and get the appropriate inode entry.
+            -> Create an inode entry.
+            -> Check the path of the added file. If the same parent directory exists within the directory structure,
+            add it there. If the same parent directory does not exist within the directory structure, create the
+            directory structure and then add the node to that path.
             -> Create a node and add the node to the directory tree
-            -> Add the node to the directoryTree.
-
          */
-        return false;
+        String parentPath;
+        parentPath = path.toAbsolutePath().getParent().toString();
+        // This block changes the separator from windows format to linux format and also treats the drive as a
+        // folder within the root directory.
+        if (path.getFileSystem().getSeparator().equals("\\")){
+            parentPath = parentPath.replace("\\", "/");
+            parentPath = parentPath.replaceFirst(":", "");
+            parentPath = "/" + parentPath;
+        }
+        if (!path.toFile().exists())
+            throw new Exception("File Does Not Exist");
+        INode iNode = gateway.addFile(path);
+        Node parentNode = dir.getOrCreatePath(parentPath, gateway.getDirectoryStoreGateway());
+        dir.addNode(parentNode, path.getFileName().toString(), iNode.getiNodeAddress());
+        __writeDirtyNodes();
     }
 
     /**
@@ -213,6 +222,16 @@ public class FileSystem {
         // IMPLEMENT
         return -1;
     }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Private Auxiliary Methods
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    private void __writeDirtyNodes() throws Exception{
+        LinkedList<Node> dirtyNodes = dir.getDirtyNodes();
+        while (!dirtyNodes.isEmpty())
+            gateway.addNode(dirtyNodes.pop());
+    }
+
     //////////////////////////
     // GETTERS AND SETTERS
     //////////////////////////

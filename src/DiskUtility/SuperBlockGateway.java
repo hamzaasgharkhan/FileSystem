@@ -21,6 +21,7 @@ import Utilities.BinaryUtilities;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.nio.file.Path;
 
 /**
  * This class serves as a Gateway between the SuperBlock class and the actual files on disk that contain the SuperBlock.
@@ -85,8 +86,11 @@ public abstract class SuperBlockGateway{
      * @param path The path to the FileSystem.
      * @return SuperBlock Object stored in the SuperBlock file
      */
-    protected static SuperBlock getSuperBlock(String path) throws Exception{
-        File file = new File(path + "/super-block");
+    protected static SuperBlock getSuperBlock(Path path) throws Exception{
+        File file = path.resolve("super-block").toFile();
+        if (!file.exists()){
+            throw new Exception("SuperBlock File Does Not Exist.");
+        }
         byte[] byteArray;
         FileInputStream fin;
         try {

@@ -60,7 +60,7 @@ public class Node {
     }
 
     public Node(String name, Node parentNode){
-        this(name, parentNode, 0, FLAGS.DEFAULT_NODE_DIRECTORY);
+        this(name, parentNode, -1, FLAGS.DEFAULT_NODE_DIRECTORY);
     }
 
     public Node(String name, Node parentNode, long iNodeAddress){
@@ -70,7 +70,7 @@ public class Node {
 
 
     public boolean isDirectory(){
-        return checkFlag(DIRECTORY_FLAG_MASK);
+        return checkFlag(FLAGS.DEFAULT_NODE_DIRECTORY);
     }
 
     /**
