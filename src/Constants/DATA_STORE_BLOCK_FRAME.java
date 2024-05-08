@@ -3,7 +3,7 @@ package Constants;
 public abstract class DATA_STORE_BLOCK_FRAME {
     public static final int DATA_STORE_FRAME_SIZE = 4096;
     public static final int DATA_STORE_FRAME_BITMAP_SIZE = 453;
-    public static final int DATA_STORE_FRAME_DATA_SIZE = 3642;
+    public static final int DATA_STORE_FRAME_DATA_SIZE = 3624;
 
     public static final int MD5_HASH_INDEX = 0;
     public static final int BYTES_OCCUPIED_INDEX = 16;

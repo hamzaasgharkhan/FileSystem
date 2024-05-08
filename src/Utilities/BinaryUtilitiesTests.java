@@ -85,7 +85,6 @@ public class BinaryUtilitiesTests {
         int expected = 4;
         Assertions.assertEquals(expected, actual);
     }
-
     @Test
     @DisplayName("getFirstUsedIndex No Index Possible")
     public void getFirstUsedIndexNoPossibleIndex(){
@@ -93,6 +92,12 @@ public class BinaryUtilitiesTests {
         int expected = -1;
         Assertions.assertEquals(expected, actual);
     }
-
-
+    @Test
+    @DisplayName("setByteIndices")
+    public void setByteIndices(){
+        byte b = (byte) 0b11011101;
+        byte actual = BinaryUtilities.setByteIndices(b, 1, 4, 0);
+        byte expected = (byte)0b10000101;
+        Assertions.assertEquals(expected, actual);
+    }
 }

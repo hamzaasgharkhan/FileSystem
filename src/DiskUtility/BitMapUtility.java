@@ -20,11 +20,47 @@ public class BitMapUtility {
     private byte[] thumbnailStoreBitMap;
     BitMapUtility(Path path, boolean initialize) throws Exception{
         basePath = path;
-        if (initialize)
+        if (initialize){
             __createBitmaps();
-        else
+        }else{
             __loadBitMaps(path);
+        }
+    }
+
+    private long getLastAllocatedBlockIndex(String storeName) {
+        byte[] bitmap = switch(storeName){
+            case "DIRECTORY_STORE" -> directoryStoreBitMap;
+            case "EXTENT_STORE" -> extentStoreBitMap;
+            case "INODE_STORE" -> iNodeStoreBitMap;
+            case "DATA_STORE" -> dataStoreBitMap;
+            case "THUMBNAIL_STORE" -> thumbnailStoreBitMap;
+            default -> throw new RuntimeException("Invalid Store Name");
+        };
+        // In case of Half Bitmap
+        if (bitmap == dataStoreBitMap || bitmap == thumbnailStoreBitMap){
+            for (int i = bitmap.length -1; i > -1; i--){
+                if (bitmap[i] == (byte)0b10001000)
+                    continue;
+                if ((bitmap[i] & (byte)0b00001111) != 0b00001000)
+                    return (i * 2L) + 1;
+                return i * 2L;
+            }
+        } else {
+            // In case of singular bitmap
+            for (int i = bitmap.length -1; i > -1; i--){
+                if (bitmap[i] == -1)
+                    continue;
+                for (int j = 0; j < 8; j++){
+                    if (((bitmap[i] >> j) & 0b00000001) == 1)
+                        return (i * 8L) + (7 - j);
+                }
+            }
+        }
+        // IMPLEMENT
+        return 0;
     };
+
+    ;
     BitMapUtility(Path path) throws Exception{
         this(path, false);
     };
@@ -120,13 +156,20 @@ public class BitMapUtility {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Singular BITMAP METHODS
+    //
+    // Singular Bitmaps are single bit bitmaps. 1 bit represents a block/frame.
+    // The following stores rely on Singular Bitmaps
+    //  -> DIRECTORY_STORE
+    //  -> EXTENT_STORE
+    //  -> INODE_STORE
+    //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     protected long getFreeIndexSingularBitmap(String storeName){
         byte[] bitmap = switch (storeName) {
             case "DIRECTORY_STORE" -> directoryStoreBitMap;
             case "EXTENT_STORE" -> extentStoreBitMap;
             case "INODE_STORE" -> iNodeStoreBitMap;
-            default -> throw new RuntimeException("Invalid Store Name for Quarter Bitmap");
+            default -> throw new RuntimeException("Invalid Store Name for Singular Bitmap");
         };
         for (int i = 0; i < bitmap.length; i++){
             // All indices are allocated
@@ -158,12 +201,12 @@ public class BitMapUtility {
         return length * 8L;
     }
 
-    public void setIndexSingularBitmap(String storeName, long index, boolean value){
+    protected void setIndexSingularBitmap(String storeName, long index, boolean value){
         byte[] bitmap = switch (storeName) {
             case "DIRECTORY_STORE" -> directoryStoreBitMap;
             case "EXTENT_STORE" -> extentStoreBitMap;
             case "INODE_STORE" -> iNodeStoreBitMap;
-            default -> throw new RuntimeException("Invalid Store Name for Quarter Bitmap");
+            default -> throw new RuntimeException("Invalid Store Name for Singular Bitmap");
         };
         if (index > bitmap.length)
             throw new IndexOutOfBoundsException("Invalid Index For Bitmap");
@@ -177,6 +220,124 @@ public class BitMapUtility {
         bitmap[byteIndex] = targetByte;
         setDirtyFlag(storeName);
         writeToFile(storeName, index);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Half BITMAP METHODS
+    //
+    // Half Bitmaps are bitmaps that take up half a byte. 4 bit represents a block/frame.
+    // The following stores rely on Singular Bitmaps
+    //  -> DATA_STORE
+    //  -> THUMBNAIL_STORE
+    //
+    //  The 4 bits are divided into the following segments
+    //  F | TQ | H | Q
+    // Q set to 1 indicates that Quarter of the block is full
+    // H set to 1 indicates that Half of the block is full (Q must also be set to 1 in this case)
+    // TQ set to 1 indicates that Three Quarters of the block is full (H and Q must also be set to 1 in this case)
+    // F set to 1 indiactes that the entire block is full (given that all the other bits are also set to 1).
+    //
+    // SPECIAL CASES
+    // Case 1:
+    //      1 | 0 | 0 | 0  -> Represents an empty block that is also not allocated (does not exist on disk)
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    protected long getFreeIndexHalfBitmap(String storeName, long bytesToWrite){
+        /*
+        Basic:
+            Return the first block that has free space.
+            Currently, the bytesToWrite parameter is being ignored. In a more sophisticated implementation down the line,
+            the bytesToWrite parameter will be utilized to decide which block to return.
+        Optimal:
+            Check the fileSize and provide a block index accordingly. Also take into consideration the fact that a file
+            can be larger than the current blocks allocated and hence would require the allocation of more blocks.
+            Ideally should return the smallest block available to satisfy the fileSize needs.
+         */
+        byte[] bitmap = switch (storeName) {
+            case "DATA_STORE" -> dataStoreBitMap;
+            case "THUMBNAIL_STORE" -> thumbnailStoreBitMap;
+            default -> throw new RuntimeException("Invalid Store Name for Half Bitmap");
+        };
+        for (int i = 0; i < bitmap.length; i++){
+            byte dataStoreByte = bitmap[i];
+            if (dataStoreByte == -1) {
+                continue;
+            }
+            if ((dataStoreByte & 0b11110000) != 0b11110000) {
+                return (long)i * 2L;
+            }
+            else {
+                return (i * 2L) + 1;
+            }
+        }
+        // If the code reaches this point then new blocks need to be allocated.
+        int index = bitmap.length;
+        byte[] arr = new byte[index + 2046];
+        System.arraycopy(bitmap, 0, arr, 0, index);
+        for (int i = index; i < arr.length; i++)
+            arr[i] = (byte)0b10001000;
+        switch (storeName) {
+            case "DATA_STORE" -> dataStoreBitMap = arr;
+            case "THUMBNAIL_STORE" -> thumbnailStoreBitMap = arr;
+            default -> throw new RuntimeException("THIS CODE SHOULD NOT EXECUTE");
+        };
+        setDirtyFlag(storeName);
+        writeToFile(storeName);
+        return index * 2L;
+    }
+
+    /**
+     * Update the bitmap at the particular index
+     * @param index index of the bitmap needed to be updated
+     * @param bytesOccupied Number of bytes occupied by the index
+     */
+    protected void setIndexHalfBitmap(String storeName, long index, short bytesOccupied){
+        byte[] bitmap = switch (storeName) {
+            case "DATA_STORE" -> dataStoreBitMap;
+            case "THUMBNAIL_STORE" -> thumbnailStoreBitMap;
+            default -> throw new RuntimeException("Invalid Store Name for Half Bitmap");
+        };
+        byte newBitmap;
+        int totalBytes = DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE;
+        if (bytesOccupied == 0){
+            newBitmap = (byte)0b00001001;
+        } else if (bytesOccupied < totalBytes / 4){
+            newBitmap = (byte)0b00000000;
+        } else if (bytesOccupied < totalBytes / 2){
+            newBitmap = (byte)0b00000001;
+        } else if (bytesOccupied <  3 * (totalBytes / 4)){
+            newBitmap = (byte)0b00000011;
+        } else if (bytesOccupied < totalBytes){
+            newBitmap = (byte)0b00000111;
+        } else {
+            newBitmap = (byte)0b00001111;
+        }
+        int byteIndex = (int) (index / 2L);
+        int bitIndex = (int) (index % 2L);
+        byte targetByte = dataStoreBitMap[byteIndex];
+        // Update the byte.
+        if (bitIndex == 1)
+            targetByte = (byte)((targetByte & (byte)0b11110000) | (newBitmap & (byte)0b00001111));
+        else
+            targetByte = (byte)((targetByte & (byte)0b00001111) | ((newBitmap & (byte)0b00001111) << 4));
+        bitmap[byteIndex] = targetByte;
+        setDirtyFlag(storeName);
+        writeToFile(storeName, byteIndex);
+    }
+
+    protected boolean isIndexOccupiedHalfBitmap(String storeName, long index){
+        byte[] bitmap = switch (storeName) {
+            case "DATA_STORE" -> dataStoreBitMap;
+            case "THUMBNAIL_STORE" -> thumbnailStoreBitMap;
+            default -> throw new RuntimeException("Invalid Store Name for Half Bitmap");
+        };
+        int byteIndex = (int) (index / 2L);
+        int bitIndex = (int) (index % 2L);
+        byte requiredByte = bitmap[byteIndex];
+        if (bitIndex == 0)
+            return !(((byte)(requiredByte & (byte)0b11110000)) == (byte)0b10000000);
+        else
+            return !(((byte)(requiredByte & (byte)0b00001111)) == (byte)0b00001000);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -205,94 +366,24 @@ public class BitMapUtility {
     protected void setIndexINodeStore(long index, boolean value){
         setIndexSingularBitmap("INODE_STORE", index, value);
     }
-
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // DATA_STORE METHODS
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public long getFreeIndexDataStore(long bytesToWrite){
-        /*
-        Basic:
-            Return the first block that has free space.
-        Optimal:
-            Check the fileSize and provide a block index accordingly. Also take into consideration the fact that a file
-            can be larger than the current blocks allocated and hence would require the allocation of more blocks.
-            Ideally should return the smallest block available to satisfy the fileSize needs.
-         */
-        for (int i = 0; i < dataStoreBitMap.length; i++){
-            byte dataStoreByte = dataStoreBitMap[i];
-            if (dataStoreByte == -1) {
-                continue;
-            }
-            if ((dataStoreByte & 0b11110000) != 0b11110000) {
-                return (long)i * 2;
-            }
-            else {
-                return (i * 2L) + 1;
-            }
-        }
-        // If the code reaches this point then new blocks need to be allocated.
-        int index = dataStoreBitMap.length;
-        byte[] arr = new byte[index + 16];
-        System.arraycopy(dataStoreBitMap, 0, arr, 0, index);
-        byte[] blankSlots = {(byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
-                (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
-                (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001,
-                (byte)0b10011001, (byte)0b10011001, (byte)0b10011001, (byte)0b10011001};
-        System.arraycopy(blankSlots, 0, arr, index, 16);
-        dataStoreBitMap = arr;
-        setDirtyFlag("DATA_STORE");
-        writeToFile("DATA_STORE");
-        return index * 2L;
+    protected long getFreeIndexDataStore(long bytesToWrite){
+        return getFreeIndexHalfBitmap("DATA_STORE", bytesToWrite);
+    }
+    protected void setIndexDataStore(long index, short bytesOccupied){
+        setIndexHalfBitmap("DATA_STORE", index, bytesOccupied);
     }
 
-    /**
-     * Update the bitmap at the particular index
-     * @param index index of the bitmap needed to be updated
-     * @param bytesOccupied Number of bytes occupied by the index
-     */
-    public void setIndexDataStore(long index, short bytesOccupied){
-        // The bitmap is provided in the 4 least significant bits of the byte.
-        byte bitmap;
-        int totalBytes = DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE;
-        if (bytesOccupied == 0) // block is empty
-            bitmap = (byte) 0b00001000;
-        else if (bytesOccupied < totalBytes / 4)    // block is less than quarter full
-            bitmap = (byte) 0b00000000;
-        else if (bytesOccupied < totalBytes / 2)    // block is less than half full but at least quarter full
-            bitmap = (byte) 0b00000001;
-        else if (bytesOccupied < 3 * (totalBytes / 4)) // block is less than 3/4th full but at least half full
-            bitmap = (byte) 0b00000010;
-        else if (bytesOccupied < totalBytes)    // block is at least 3/4th full but not completely full
-            bitmap = (byte) 0b00000100;
-        else    // block is full
-            bitmap = (byte) 0b00001000;
-        int byteIndex = (int) (index / 2L);
-        int bitIndex = (int) (index % 2L);
-        byte requiredByte = dataStoreBitMap[byteIndex];
-        // Updated the byte.
-        if (bitIndex == 1)
-            requiredByte = (byte)((requiredByte & (byte)0b11110000) | (bitmap & (byte)0b00001111));
-        else
-            requiredByte = (byte)((requiredByte & (byte)0b00001111) | ((bitmap & (byte)0b00001111) << 4));
-        dataStoreBitMap[byteIndex] = requiredByte;
-        setDirtyFlag("DATA_STORE");
-        writeToFile("DATA_STORE");
+    protected boolean isIndexOccupiedDataStore(long index){
+        return isIndexOccupiedHalfBitmap("DATA_STORE", index);
     }
-
-    /**
-     * Checks whether a block with the given index exists on disk or not.
-     * @param index The index of the target block.
-     * @return true if and only if the block has been allocated on disk.
-     */
-    public boolean isDataStoreIndexAllocated(long index){
-        int byteIndex = (int) (index / 2L);
-        int bitIndex = (int) (index % 2L);
-        byte requiredByte = dataStoreBitMap[byteIndex];
-        if (bitIndex == 0)
-            return ((byte)(requiredByte & (byte)0b11110000)) == (byte)0b10010000;
-        else
-            return ((byte)(requiredByte & (byte)0b00001111)) == (byte)0b00001001;
+    protected long getFreeIndexThumbnailStore(long bytesToWrite){
+        return getFreeIndexHalfBitmap("THUMBNAIL_STORE", bytesToWrite);
+    }
+    protected void setIndexThumbnailStore(long index, short bytesOccupied){
+        setIndexHalfBitmap("THUMBNAIL_STORE", index, bytesOccupied);
+    }
+    protected boolean isIndexOccupiedThumbnailStore(long index){
+        return isIndexOccupiedHalfBitmap("THUMBNAIL_STORE", index);
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // EXTENT_STORE METHODS

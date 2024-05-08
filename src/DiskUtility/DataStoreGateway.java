@@ -1,19 +1,17 @@
 package DiskUtility;
 import Constants.DATA_STORE_BLOCK_FRAME;
-import FileSystem.INode;
 import Utilities.BinaryUtilities;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.AbstractQueue;
 import java.util.LinkedList;
 
 /**
  * This class provides an interface between the DataStore files and the rest of the filesystem.
  */
 class DataStoreGateway {
-    private static class DataBlock {
+    protected static class DataBlock {
         static String getHash(byte[] arr){
             if (arr.length != 4096)
                 throw new RuntimeException("Invalid Data block. Array should have 4096 bytes.");
@@ -56,7 +54,7 @@ class DataStoreGateway {
             // Control variables for run start and end.
             int start = -1;
             int end;
-            for (int i = 19; i < 472; i++){
+            for (int i = DATA_STORE_BLOCK_FRAME.BITMAP_INDEX; i < DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX; i++){
                 // -> Case 1: Start has not been set yet.
                 if (start == -1) {
                     // In case the byte has no free indices, move to the next byte.
@@ -70,25 +68,25 @@ class DataStoreGateway {
                             start = BinaryUtilities.getFirstFreeIndex(arr[i], j);
                             if (start == -1)
                                 break;
-                            start = (i - 19) * 8 + start;
+                            start = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + start;
                         } else {
                             // If start has been set, look for a possible end in the remaining byte
                             end = BinaryUtilities.getFirstUsedIndex(arr[i], j);
                             // If no end is found within the byte, exit the loop
                             if (end == -1){
                                 // If it is the last byte, set the last index as the end and return runs.
-                                if (i == 471){
-                                    end = (i - 19) * 8 + 7;
+                                if (i == DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX - 1){
+                                    end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
                                     runs.add(start);
-                                    runs.add(end);
+                                    runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
                                     return runs.stream().mapToInt(x->x).toArray();
                                 }
                                 break;
                             }
                             // If end has been found, add the run to the linked list.
-                            end = (i - 19) * 8 + end;
+                            end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + end;
                             runs.add(start);
-                            runs.add(end);
+                            runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
                             start = -1;
                             // Set the counter of the loop to the end index to start from the next index.
                             j = end;
@@ -98,10 +96,10 @@ class DataStoreGateway {
                     // In case the entire block is free, move to the next byte.
                     if (arr[i] == 0) {
                         // If it is the last byte, set the last index as the end of run and return.
-                        if (i == 471){
-                            end = (i - 19) * 8 + 7;
+                        if (i == DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX - 1){
+                            end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
                             runs.add(start);
-                            runs.add(end);
+                            runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
                             return runs.stream().mapToInt(x->x).toArray();
                         }
                         continue;
@@ -114,19 +112,19 @@ class DataStoreGateway {
                             if (end == -1){
                                 // If it is the last byte, set the last index as the end and return runs.
                                 if (i == 471){
-                                    end = (i - 19) * 8 + 7;
+                                    end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
                                     runs.add(start);
-                                    runs.add(end);
+                                    runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
                                     return runs.stream().mapToInt(x->x).toArray();
                                 }
                                 break;
                             }
-                            end = (i - 19) * 8 + end;
+                            end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + end;
+                            j = end;
                             runs.add(start);
-                            runs.add(end);
+                            runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
                             start = -1;
                             end = -1;
-                            j = end;
                         } else {
                             // If end has been set, look for a possible start in the remaining byte
                             start = BinaryUtilities.getFirstFreeIndex(arr[i], j);
@@ -134,14 +132,13 @@ class DataStoreGateway {
                             if (start == -1)
                                 break;
                             // If start has been found, add the run to the linked list.
-                            start = (i - 19) * 8 + start;
+                            start = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + start;
                             // Set the counter of the loop to the end index to start from the next index.
                             j = start;
                         }
                     }
                 }
             }
-
             return runs.stream().mapToInt(x->x).toArray();
         }
 
@@ -151,13 +148,35 @@ class DataStoreGateway {
          * @param arr The block array
          * @param start Starting index of the run
          * @param length length of the run
+         * @param value Set to true if the run is occupied. Set to false if the run is not occupied.
          */
-        static void setRunOccupied(byte[] arr, int start, int length){
+        static void setRunOccupied(byte[] arr, int start, int length, boolean value){
             if (arr.length != 4096)
                 throw new RuntimeException("Invalid Data block. Array should have 4096 bytes.");
-            // IMPLEMENT LATER
+            int bitValue = (value) ? 1: 0;
+            // Set the bitmaps.
+            int startByteIndex = DATA_STORE_BLOCK_FRAME.BITMAP_INDEX + (start / 8);
+            int startBitIndex = (start % 8);    // Subtracted from 7 to ensure that the leftmost bit is index 0
+            int endByteIndex = DATA_STORE_BLOCK_FRAME.BITMAP_INDEX + (start + (length / 8));
+            int endBitIndex = (length % 8);     // Subtracted from 7 to ensure that the leftmost bit is index 0
+            // Case 1: Both the start and end indices lie in the same byte
+            if (startByteIndex == endByteIndex){
+                arr[startByteIndex] = BinaryUtilities.setByteIndices(arr[startByteIndex], startBitIndex, endBitIndex, bitValue);
+                return;
+            }
+            // Case 2: The start and end indices lie in different bytes
+            arr[startByteIndex] = BinaryUtilities.setByteIndices(arr[startByteIndex], startBitIndex, 7, bitValue);
+            for (int i = startByteIndex + 1; i < endByteIndex; i++){
+                if (bitValue == 1)
+                    arr[i] = -1;
+                else
+                    arr[i] = 0;
+            }
+            if (endBitIndex != 0 && endByteIndex < DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX)
+                arr[endByteIndex] = BinaryUtilities.setByteIndices(arr[endByteIndex], 0, endBitIndex, bitValue);
         }
     }
+
     File dataStoreFile;
     final BitMapUtility bitMapUtility;
     DataStoreGateway(Path path, BitMapUtility bitMapUtility) throws Exception {
@@ -182,7 +201,7 @@ class DataStoreGateway {
         // Contains the data of the user input file
         byte[] inputBlock = new byte[4096];
         // Contains a data block within data-store
-        byte[] dataBlock = new byte[4096];
+        byte[] dataBlock;
         bytesToWrite = fileSize = file.length();
         if (fileSize == 0L)
             throw new Exception("Cannot Call addFile on a directory.");
@@ -212,10 +231,11 @@ class DataStoreGateway {
         // RETURN THE INODE
         while (bytesToWrite > 0){
             int bytesWrittenInRunningBlock = 0;
+            dataBlock = new byte[4096];
             index = bitMapUtility.getFreeIndexDataStore(bytesToWrite);
             // If the dataBlock is allocated and exists on disk then read it from disk otherwise work with the empty
             // block.
-            if (bitMapUtility.isDataStoreIndexAllocated(index)){
+            if (bitMapUtility.isIndexOccupiedDataStore(index)){
                 try {
                     dataFile.seek(index * 4096);
                     dataFile.readFully(dataBlock);
@@ -238,8 +258,7 @@ class DataStoreGateway {
             int start, end, length;
             for (int i = 0; i < runs.length; i+=2) {
                 start = runs[i];
-                end = runs[i + 1];
-                length = end - start;
+                length = runs[i + 1];
                 if ((((pointer + bytesToWrite) < 4096) ||
                         (((pointer + bytesToWrite) > 4096) && ((pointer + length) < 4096)))) {
                     // Case 1: All the data is within the buffer, no more data needs to be read from the file.
@@ -253,8 +272,9 @@ class DataStoreGateway {
                     // to the dataBlock.
                     // Set the smaller value of the two to localBytesToWrite
                     int localBytesToWrite = (length > bytesToWrite) ? (int) bytesToWrite : length;
-                    System.arraycopy(dataBlock, start, inputBlock, pointer, localBytesToWrite);
-                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite);
+                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX +  start, localBytesToWrite);
+                    // The bytes that are written will be set to 0 within the inputBlock array. Fix this issue.
+                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite, true);
                     bytesOccupied += (short) localBytesToWrite;
                     bytesWrittenInRunningBlock += localBytesToWrite;
                     pointer += localBytesToWrite;
@@ -266,13 +286,13 @@ class DataStoreGateway {
                     // Set to the smaller value of the two: length of the run and bytesToWrite.
                     int localBytesToWrite = (length > bytesToWrite) ? (int) bytesToWrite : length;
                     int localBytesWritten = 4096 - pointer;
-                    System.arraycopy(inputBlock, pointer, dataBlock, start, localBytesWritten);
+                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX +  start, localBytesWritten);
                     // Still more than 4096 bytes left in the file to read
                     try {
-                        if (bytesToWrite > 4096) {
+                        if (bytesToWrite - localBytesWritten > 4096) {
                             inputFile.readFully(inputBlock, 0, 4096);
                         } else {
-                            inputFile.readFully(inputBlock, 0, (int) bytesToWrite);
+                            inputFile.readFully(inputBlock, 0, (int) bytesToWrite - localBytesWritten);
                         }
                     } catch (EOFException e){
                         throw new Exception("Request to read more bytes than the file has left." + e.getMessage());
@@ -280,9 +300,9 @@ class DataStoreGateway {
                         throw new Exception("Unable to access the contents of the user input file." + e.getMessage());
                     }
                     pointer = 0;
-                    System.arraycopy(inputBlock, pointer, dataBlock, start + localBytesWritten, localBytesToWrite - localBytesWritten);
+                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX + start + localBytesWritten, localBytesToWrite - localBytesWritten);
                     pointer += localBytesToWrite - localBytesWritten;
-                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite);
+                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite, true);
                     bytesOccupied += (short) localBytesToWrite;
                     bytesWrittenInRunningBlock += localBytesToWrite;
                     extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));

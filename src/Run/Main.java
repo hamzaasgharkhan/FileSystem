@@ -8,8 +8,8 @@ public class Main {
         Path createPath = Paths.get("");
         Path mountPath = Paths.get("Aqua");
         try {
-//            fs = FileSystem.createFileSystem(createPath, "Aqua");
-            fs = FileSystem.mount(mountPath);
+            fs = FileSystem.createFileSystem(createPath, "Aqua");
+//            fs = FileSystem.mount(mountPath);
 //            fs.createDirectory("/","Obama1");
 //            fs.createDirectory("/","Osama1");
 //            fs.createDirectory("/","Iqbal");
@@ -19,12 +19,12 @@ public class Main {
 //            fs.createDirectory("/Obama1","Obama2");
 //             LS needs to be fixed.
 //            fs.createDirectory("/", "Obama");
+            Path path = Paths.get("file.jpg");
+            if (!path.toFile().exists())
+                throw new Exception("NO SUCH FILE.");
+            fs.addFile(path);
 //            fs.ls("/");
-//            path = Paths.get("file.png");
-//            if (!path.toFile().exists())
-//                throw new Exception("NO SUCH FILE.");
-////            fs.addFile(path);
-            fs.ls("/Obama");
+            fs.ls("/");
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
