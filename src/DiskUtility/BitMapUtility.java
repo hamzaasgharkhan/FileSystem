@@ -138,7 +138,7 @@ public class BitMapUtility {
         };
         for (int i = 0; i < arrays.length; i++){
             try {
-                FileInputStream fin = new FileInputStream(path.resolve(paths[0]).toFile());
+                FileInputStream fin = new FileInputStream(path.resolve(paths[i]).toFile());
                 arrays[i] = fin.readAllBytes();
                 fin.close();
             } catch (FileNotFoundException e) {
@@ -180,7 +180,7 @@ public class BitMapUtility {
                 for (int j = 7; j > -1; j--) {
                     if (((bitmap[i] >> j) & 1) == 0) {
                         bitIndex = 7 - j;
-                        return i + bitIndex;
+                        return (i * 8) + bitIndex;
                     }
                 }
             }
@@ -219,7 +219,7 @@ public class BitMapUtility {
             targetByte = (byte)(targetByte & ~(0x01 << 7 - bitIndex));
         bitmap[byteIndex] = targetByte;
         setDirtyFlag(storeName);
-        writeToFile(storeName, index);
+        writeToFile(storeName, byteIndex);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -384,56 +384,6 @@ public class BitMapUtility {
     }
     protected boolean isIndexOccupiedThumbnailStore(long index){
         return isIndexOccupiedHalfBitmap("THUMBNAIL_STORE", index);
-    }
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // EXTENT_STORE METHODS
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /**
-     * Returns free extent index that can hold consecutive extent entries
-     * @param totalEntries Number of consecutive entries / extent blocks needed
-     * @return Appropriate index within the extent store to store the specified number of extent entries
-     */
-    public long getFreeIndexExtentStore(int totalEntries) {
-        int runningFreeEntries = 0;
-        long firstIndex = -1;
-        for (int i = 0; i < extentStoreBitMap.length; i++){
-            // If all indices in byte are used.
-            if (extentStoreBitMap[i] == 0b01010101){
-                firstIndex = -1;
-                runningFreeEntries = 0;
-                continue;
-            }
-            for (int j = 3; j > -1; j--){
-                if (((extentStoreBitMap[i] >> (j * 2)) & 0b00000001) == 1){
-                    if (firstIndex == -1){
-                        firstIndex = (long)i * 4 + (3 - j);
-                        runningFreeEntries = 1;
-                    } else {
-                        runningFreeEntries++;
-                    }
-                    if (runningFreeEntries == totalEntries)
-                        return firstIndex;
-                } else {
-                    firstIndex = -1;
-                    runningFreeEntries = 0;
-                }
-            }
-        }
-        // The requirement could not be met with the current bitmap.
-        // Extending the bitmap.
-        int extendFactor = totalEntries / 16;
-        byte[] arr = new byte[extentStoreBitMap.length + (16 * (extendFactor + 1))];
-        System.arraycopy(extentStoreBitMap, 0, arr, 0, extentStoreBitMap.length);
-        for (int i = extentStoreBitMap.length; i< arr.length; i++){
-            arr[i] = (byte) 0b10101010;
-        }
-        extentStoreBitMap = arr;
-        setDirtyFlag("EXTENT_STORE");
-        writeToFile("EXTENT_STORE");
-        if (firstIndex == -1)
-            return extentStoreBitMap.length;
-        else
-            return firstIndex;
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // FILE UTILITIES

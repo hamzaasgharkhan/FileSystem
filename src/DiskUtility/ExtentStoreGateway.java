@@ -1,5 +1,6 @@
 package DiskUtility;
 
+import Constants.DATA_STORE_BLOCK_FRAME;
 import Constants.EXTENT_STORE_FRAME;
 import Constants.VALUES;
 import Utilities.BinaryUtilities;
@@ -32,15 +33,15 @@ class ExtentStoreGateway {
         }
 
         /**
-         * This method takes an extentFrame and calculates the index of its last block along with the byte index after
-         * the end of the extent in the last block.
+         * This method takes an extentFrame and calculates the index of the block after it along with the byte index of
+         * its first byte.
          * @param extentFrame The target ExtentFrame object
-         * @return An array of two long integers. The first value is the index of the last block. The second value is
-         * the index of the byte after the extent in the last block.
+         * @return An array of two long integers. The first value is the index of the next block. The second value is
+         * the first byte index of the block.
          */
-        static long[] getLastBlock(ExtentFrame extentFrame){
-            long additionalBlocks = (extentFrame.length + extentFrame.offset) / 3642;
-            long lastByteIndex = (extentFrame.length + extentFrame.offset) % 3642;
+        static long[] getNextBlock(ExtentFrame extentFrame){
+            long additionalBlocks = (extentFrame.length + extentFrame.offset) / DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE;
+            long lastByteIndex = (extentFrame.length + extentFrame.offset) % DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE;
             return new long[]{extentFrame.dataStoreIndex + additionalBlocks, lastByteIndex};
         }
         /**
@@ -56,10 +57,6 @@ class ExtentStoreGateway {
                 return inputExtentFrames;
             }
             LinkedList<ExtentFrame> outputExtentFrames = new LinkedList<ExtentFrame>();
-            // This boolean indicates whether an extent has been started. While an extent has been started, others can
-            // be appended to it. Once no more are to be appended to it, the boolean will be set to false and that will
-            // be the final state of the running extent.
-            boolean createNew = true;
             // Sort the extent frames. After sorting, the first extent is guaranteed to be at a lower index. In the
             // case of multiple extents at the same index, they will be sorted based on their offsets within the block.
             inputExtentFrames.sort((ExtentFrame o1, ExtentFrame o2) -> {
@@ -76,18 +73,24 @@ class ExtentStoreGateway {
             ExtentFrame runningExtent = inputExtentFrames.get(0);
             for (int i = 1; i < inputExtentFrames.size(); i++){
                 ExtentFrame currentExtent = inputExtentFrames.get(i);
-                long[] runningDetails = getLastBlock(runningExtent);
-                if (currentExtent.dataStoreIndex == runningDetails[0] &&
-                    currentExtent.offset == runningDetails[1]){
+                long[] runningDetails = getNextBlock(runningExtent);
+                // Check the following two cases:
+                // 1. Both extents are in the same block and are contiguous
+                // 2. The extents are in consecutive blocks and contiguous
+                // In both cases, extend the length of the first extent to incorporate the second extent.
+                if ((currentExtent.dataStoreIndex == runningDetails[0] &&
+                    currentExtent.offset == runningDetails[1])){
                     runningExtent.length += currentExtent.length;
                 } else {
                     outputExtentFrames.add(runningExtent);
                     runningExtent = currentExtent;
-                    if (i == inputExtentFrames.size() - 1)
+                    if (i == inputExtentFrames.size() - 1){
                         outputExtentFrames.add(runningExtent);
+                        return outputExtentFrames;
+                    }
                 }
             }
-            // CHECK IF IT WORKS.
+            outputExtentFrames.add(runningExtent);
             return outputExtentFrames;
         }
     }
@@ -99,7 +102,7 @@ class ExtentStoreGateway {
      * This method takes a LinkedList of ExtentFrame objects and creates appropriate ExtentFrame entries for the frames.
      * @param extentFrames LinkedList of target ExtentFrame objects
      * @return An array of two longs. The first element is the extentAddress of the entry and the second element is the
-     * length of the extent entries.
+     * length of the extent entries (length of run).
      * @throws Exception in case of IOErrors handling the extentStore file.
      */
     public long[] addExtentEntry(LinkedList<ExtentFrame> extentFrames) throws Exception{
@@ -112,7 +115,7 @@ class ExtentStoreGateway {
             __addExtentEntry(byteArray, extentFrames.get(i), i);
         }
         // Get the appropriate index in the extentStore for the extent based on its size.
-        long index = bitMapUtility.getFreeIndexExtentStore(extentFrames.size());
+        long index = bitMapUtility.getFreeIndexExtentStore();
         try{
             file = new RandomAccessFile(extentStoreFile, "rw");
         } catch (FileNotFoundException e){
@@ -121,6 +124,7 @@ class ExtentStoreGateway {
         try{
             file.seek(index * EXTENT_STORE_FRAME.SIZE);
             file.write(byteArray);
+            bitMapUtility.setIndexExtentStore(index, true);
         } catch (IOException e){
             throw new Exception("IOError occurred while accessing extentStore file." + e.getMessage());
         }

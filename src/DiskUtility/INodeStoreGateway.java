@@ -1,6 +1,8 @@
 package DiskUtility;
 
+import Constants.FLAGS;
 import Constants.INODE_FRAME;
+import Constants.INODE_STORE_FRAME;
 import Constants.VALUES;
 import FileSystem.INode;
 
@@ -32,24 +34,27 @@ public class INodeStoreGateway {
         long creationTime;
         long lastModifiedTime;
         long iNodeAddress;
+        long iNodeSize;
         INode iNode;
         RandomAccessFile fin;
         try {
             BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class);
             creationTime = attributes.creationTime().toMillis();
             lastModifiedTime = attributes.lastModifiedTime().toMillis();
+            iNodeSize = attributes.size();
         } catch (IOException e){
             throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
         }
         iNodeAddress = bitMapUtility.getFreeIndexINodeStore();
         iNode = new INode();
         iNode.setiNodeAddress(iNodeAddress);
+        iNode.setiNodeSize(iNodeSize);
         iNode.setCreationTime(creationTime);
         iNode.setLastModifiedTime(lastModifiedTime);
         iNode.setExtentStoreAddress(extentDetails[0]);
         iNode.setExtentCount(extentDetails[1]);
         iNode.setThumbnailStoreAddress(thumbnailStoreAddress);
-        // ADD TO FILE
+        iNode.setFlags(FLAGS.DEFAULT_INODE);
         try {
             fin = new RandomAccessFile(iNodeFile, "rw");
         } catch (FileNotFoundException e){
@@ -103,20 +108,18 @@ public class INodeStoreGateway {
     public void updateINode(INode iNode, long iNodeAddress){
         // IMPLEMENT
     }
+
     public byte[] getINodeFrame(INode iNode){
-        byte[] byteArray = new byte[INODE_FRAME.INODE_FRAME_SIZE];
-        System.arraycopy(VALUES.MAGIC_VALUE_BYTES, 0, byteArray, INODE_FRAME.MAGIC_VALUE_1_INDEX, 4);
-        System.arraycopy(VALUES.MAGIC_VALUE_BYTES, 0, byteArray, INODE_FRAME.MAGIC_VALUE_2_INDEX, 4);
-        System.arraycopy(VALUES.MAGIC_VALUE_BYTES, 0, byteArray, INODE_FRAME.MAGIC_VALUE_3_INDEX, 4);
-        System.arraycopy(iNode.getFieldBytes("INODE_ADDRESS"), 0, byteArray, INODE_FRAME.INODE_ADDRESS_INDEX, 8);
-        System.arraycopy(iNode.getFieldBytes("PARENT_INODE_ADDRESS"), 0, byteArray, INODE_FRAME.PARENT_INODE_ADDRESS_INDEX, 8);
-        System.arraycopy(iNode.getFieldBytes("SIZE"), 0, byteArray, INODE_FRAME.SIZE_INDEX, 8);
-        System.arraycopy(iNode.getFieldBytes("FLAGS"), 0, byteArray, INODE_FRAME.FLAGS_INDEX, 1);
-        System.arraycopy(iNode.getFieldBytes("CREATION_TIME"), 0, byteArray, INODE_FRAME.CREATION_TIME_INDEX, 8);
-        System.arraycopy(iNode.getFieldBytes("LAST_MODIFIED_TIME"), 0, byteArray, INODE_FRAME.LAST_MODIFIED_TIME_INDEX, 8);
-        System.arraycopy(iNode.getFieldBytes("THUMBNAIL_STORE_ADDRESS"), 0, byteArray, INODE_FRAME.THUMBNAIL_STORE_ADDRESS_INDEX, 8);
-        System.arraycopy(iNode.getFieldBytes("EXTENT_STORE_ADDRESS"), 0, byteArray, INODE_FRAME.EXTENT_STORE_ADDRESS_INDEX, 8);
-        System.arraycopy(iNode.getFieldBytes("EXTENT_COUNT"), 0, byteArray, INODE_FRAME.EXTENT_COUNT_INDEX, 8);
+        byte[] byteArray = new byte[INODE_STORE_FRAME.SIZE];
+        System.arraycopy(iNode.getMD5Hash(), 0, byteArray, INODE_STORE_FRAME.MD5_HASH_INDEX, 16);
+        System.arraycopy(iNode.getFieldBytes("INODE_ADDRESS"), 0, byteArray, INODE_STORE_FRAME.INODE_ADDRESS_INDEX, 8);
+        System.arraycopy(iNode.getFieldBytes("SIZE"), 0, byteArray, INODE_STORE_FRAME.SIZE_INDEX, 8);
+        System.arraycopy(iNode.getFieldBytes("FLAGS"), 0, byteArray, INODE_STORE_FRAME.FLAGS_INDEX, 1);
+        System.arraycopy(iNode.getFieldBytes("CREATION_TIME"), 0, byteArray, INODE_STORE_FRAME.CREATION_TIME_INDEX, 8);
+        System.arraycopy(iNode.getFieldBytes("LAST_MODIFIED_TIME"), 0, byteArray, INODE_STORE_FRAME.LAST_MODIFIED_TIME_INDEX, 8);
+        System.arraycopy(iNode.getFieldBytes("THUMBNAIL_STORE_ADDRESS"), 0, byteArray, INODE_STORE_FRAME.THUMBNAIL_STORE_ADDRESS_INDEX, 8);
+        System.arraycopy(iNode.getFieldBytes("EXTENT_STORE_ADDRESS"), 0, byteArray, INODE_STORE_FRAME.EXTENT_STORE_ADDRESS_INDEX, 8);
+        System.arraycopy(iNode.getFieldBytes("EXTENT_COUNT"), 0, byteArray, INODE_STORE_FRAME.EXTENT_COUNT_INDEX, 8);
         return byteArray;
     }
 

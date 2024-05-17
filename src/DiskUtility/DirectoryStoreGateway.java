@@ -191,7 +191,7 @@ public class DirectoryStoreGateway{
                 index,
                 FLAGS.DEFAULT_DIRECTORY_FRAME_DIR
         );
-        if (siblingsSize == 1){
+        if (siblingsSize < 2){
             frame.previousSiblingIndex = index;
             frame.nextSiblingIndex = index;
             DirectoryFrame parentFrame = getDirectoryFrame(frame.parentIndex);

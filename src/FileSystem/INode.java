@@ -65,7 +65,7 @@ public class INode {
             case "EXTENT_STORE_ADDRESS" -> BinaryUtilities.convertLongToBytes(extentStoreAddress);
             case "EXTENT_COUNT" -> BinaryUtilities.convertLongToBytes(extentCount);
             case "THUMBNAIL_STORE_ADDRESS" -> BinaryUtilities.convertLongToBytes(thumbnailStoreAddress);
-            default -> throw new IllegalArgumentException("No such field exists");
+            default -> throw new IllegalArgumentException("No such field exists: " + field);
         };
     }
 
@@ -133,4 +133,8 @@ public class INode {
         this.thumbnailStoreAddress = thumbnailStoreAddress;
     }
 
+    public byte[] getMD5Hash() {
+        // IMPLEMENT LATER
+        return new byte[16];
+    }
 }

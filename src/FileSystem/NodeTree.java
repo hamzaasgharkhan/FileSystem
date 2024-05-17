@@ -111,7 +111,7 @@ public class NodeTree {
         if (parentNode.getChildNode(name) != null)
             throw new IllegalArgumentException("Node with the same name exists");
         Node node = new Node(name, parentNode, iNodeAddress, FLAGS.DEFAULT_NODE_FILE);
-        node.parentNode = node;
+        node.parentNode = parentNode;
         parentNode.childNodes.add(node);
         dirtyNodes.add(node);
         return node;
