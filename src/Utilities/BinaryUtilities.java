@@ -131,7 +131,7 @@ public class BinaryUtilities {
      */
     public static int getFirstFreeIndex(byte b, int index){
         index = 7 - index;
-        for (int i = index; i >= 0; i--){
+        for (int i = index; i > -1; i--){
             if(((b >> i) & 1) == 0)
                 return 7 - i;
         }

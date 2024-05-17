@@ -65,7 +65,7 @@ class DataStoreGateway {
                     for (int j = 0; j < 8; j++){
                         // If the start has not been set.
                         if (start == -1){
-                            start = BinaryUtilities.getFirstFreeIndex(arr[i], j);
+                            start = j = BinaryUtilities.getFirstFreeIndex(arr[i], j);
                             if (start == -1)
                                 break;
                             start = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + start;
@@ -78,7 +78,7 @@ class DataStoreGateway {
                                 if (i == DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX - 1){
                                     end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
                                     runs.add(start);
-                                    runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
+                                    runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
                                     return runs.stream().mapToInt(x->x).toArray();
                                 }
                                 break;
@@ -86,10 +86,8 @@ class DataStoreGateway {
                             // If end has been found, add the run to the linked list.
                             end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + end;
                             runs.add(start);
-                            runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
+                            runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
                             start = -1;
-                            // Set the counter of the loop to the end index to start from the next index.
-                            j = end;
                         }
                     }
                 } else { // -> Case 2: Start has been set.
@@ -99,7 +97,7 @@ class DataStoreGateway {
                         if (i == DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX - 1){
                             end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
                             runs.add(start);
-                            runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
+                            runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
                             return runs.stream().mapToInt(x->x).toArray();
                         }
                         continue;
@@ -114,7 +112,7 @@ class DataStoreGateway {
                                 if (i == 471){
                                     end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
                                     runs.add(start);
-                                    runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
+                                    runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
                                     return runs.stream().mapToInt(x->x).toArray();
                                 }
                                 break;
@@ -122,7 +120,7 @@ class DataStoreGateway {
                             end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + end;
                             j = end;
                             runs.add(start);
-                            runs.add(end + 1); // To convert indices into length, add 1 to account for the 0 index.
+                            runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
                             start = -1;
                             end = -1;
                         } else {
@@ -173,7 +171,7 @@ class DataStoreGateway {
                     arr[i] = 0;
             }
             if (endBitIndex != 0 && endByteIndex < DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX)
-                arr[endByteIndex] = BinaryUtilities.setByteIndices(arr[endByteIndex], 0, endBitIndex, bitValue);
+                arr[endByteIndex] = BinaryUtilities.setByteIndices(arr[endByteIndex], 0, endBitIndex - 1, bitValue);
         }
     }
 
