@@ -434,11 +434,11 @@ public class BitMapUtility {
             }
             case "EXTENT_STORE" -> {
                 byteArr = extentStoreBitMap;
-                yield "directory-store.bitmap";
+                yield "extent-store.bitmap";
             }
             case "INODE_STORE" -> {
                 byteArr = iNodeStoreBitMap;
-                yield "directory-store.bitmap";
+                yield "inode-store.bitmap";
             }
             case "DATA_STORE" -> {
                 byteArr = dataStoreBitMap;

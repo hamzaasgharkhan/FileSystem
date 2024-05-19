@@ -1,6 +1,7 @@
 package FileSystem;
 
 import Constants.FLAGS;
+import DiskUtility.DirectoryStoreGateway;
 
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
@@ -141,7 +142,9 @@ public class Node {
         return iNodeAddress;
     }
 
-    public LinkedList<Node> getChildNodes(){
+    public LinkedList<Node> getChildNodes(DirectoryStoreGateway gateway) throws Exception{
+        if (checkFlag(CNR_FLAG_MASK))
+            gateway.readChildren(this);
         return this.childNodes;
     }
 

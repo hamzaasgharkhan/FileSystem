@@ -277,7 +277,7 @@ class DataStoreGateway {
                     bytesWrittenInRunningBlock += localBytesToWrite;
                     pointer += localBytesToWrite;
                     extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
-                } else if (((pointer + bytesToWrite) > 4096) && (pointer + length) > 4096) {
+                } else if (((pointer + bytesToWrite) > 4096) && (pointer + length) >= 4096) {
                     // In this case, the buffer needs to be refreshed.
                     // The run can accommodate more than what the current buffer has. Buffer needs to be updated.
                     // First copy the data that is in the dataBlock

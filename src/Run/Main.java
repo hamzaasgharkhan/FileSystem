@@ -10,7 +10,7 @@ public class Main {
         try {
 //            fs = FileSystem.createFileSystem(createPath, "Aqua");
             fs = FileSystem.mount(mountPath);
-//            fs.createDirectory("/", "sheep");
+            fs.createDirectory("/", "sheep");
 //            fs.createDirectory("/","Obama1");
 //            fs.createDirectory("/","Osama1");
 //            fs.createDirectory("/","Iqbal");
@@ -23,12 +23,13 @@ public class Main {
 //            fs.createDirectory("/Obama1/Obama2/Obama3/Obama4","Obama5");
 //             LS needs to be fixed.
 //            fs.createDirectory("/", "Obama");
-            Path path = Paths.get("file2.jpg");
+            Path path = Paths.get("1.png");
             if (!path.toFile().exists())
                 throw new Exception("NO SUCH FILE.");
-            fs.addFile(path);
+//            fs.addFile(path);
 //            fs.ls("/");
-            fs.ls("/");
+//            fs.ls("/");
+            fs.printTree();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }

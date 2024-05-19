@@ -161,7 +161,7 @@ public class NodeTree {
             node = childNode;
         }
         // In case the entire path is available within the directory structure, return the requisite node
-        if (i > nodes.length)
+        if (i == nodes.length)
             return node;
         // In case the entire path is not available, create new nodes to fulfill the path requirement.
         for (; i < nodes.length; i++){

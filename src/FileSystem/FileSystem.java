@@ -125,6 +125,27 @@ public class FileSystem {
     }
 
     /**
+     * This method takes a path and deletes the directory the path is pointing to.
+     * @param path The path of the directory
+     * @param recursive If set to true, the directory is deleted along with everything that is within the directory. If
+     *                  set to false, the directory is only deleted if it is empty. Otherwise, an exception is thrown.
+     * @throws RuntimeException In case the path does not exist, or the directory is not empty and recursive is not set to true.
+     */
+    public void removeDirectory(Path path, boolean recursive){
+
+    }
+
+    /**
+     * This method takes a path and deletes the node pointed to by the path.
+     * @param path The path of the node.
+     * @throws RuntimeException In case the path does not exist.
+     */
+    public void removeNode(String path) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        gateway.removeNode(node);
+    }
+
+    /**
      * This method provides a FileOutputStream to access the required file.
      * @param path The path of the required file
      * @return A FileOutputStream for the requested File.
@@ -222,7 +243,12 @@ public class FileSystem {
         // IMPLEMENT
         return -1;
     }
-
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Public Auxiliary Methods
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    public void printTree() throws Exception{
+        __lsChildren(dir.getRoot(), 0);
+    }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Private Auxiliary Methods
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -230,6 +256,23 @@ public class FileSystem {
         LinkedList<Node> dirtyNodes = dir.getDirtyNodes();
         while (!dirtyNodes.isEmpty())
             gateway.addNode(dirtyNodes.pop());
+    }
+
+    private void __lsChildren(Node node, int level) throws Exception{
+        System.out.print("|");
+        if (!node.isDirectory()){
+            System.out.println("-".repeat(level) + ">" + node.getName());
+            return;
+        }
+        LinkedList<Node> childNodes = node.getChildNodes(gateway.getDirectoryStoreGateway());
+        if (childNodes.isEmpty())
+            System.out.println("-".repeat(level) + ">" + node.getName());
+        else {
+            System.out.println("-".repeat(level) + ">" + node.getName());
+            for (Node childNode: childNodes){
+                __lsChildren(childNode, level + 1);
+            }
+        }
     }
 
     //////////////////////////

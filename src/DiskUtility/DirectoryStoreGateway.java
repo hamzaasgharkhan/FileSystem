@@ -177,7 +177,7 @@ public class DirectoryStoreGateway{
         if (node.getName().equals("root"))
             return __addRootNode(node);
         Node parentNode = node.getParentNode();
-        LinkedList<Node> siblings = parentNode.getChildNodes();
+        LinkedList<Node> siblings = parentNode.getChildNodes(this);
         int siblingsSize = siblings.size();
         long index = bitMapUtility.getFreeIndexDirectoryStore();
         DirectoryFrame frame = new DirectoryFrame(
@@ -189,7 +189,7 @@ public class DirectoryStoreGateway{
                 index,
                 index,
                 index,
-                FLAGS.DEFAULT_DIRECTORY_FRAME_DIR
+                node.checkFlag(Node.DIRECTORY_FLAG_MASK) ? FLAGS.DEFAULT_DIRECTORY_FRAME_DIR : FLAGS.DEFAULT_DIRECTORY_FRAME_FILE
         );
         if (siblingsSize < 2){
             frame.previousSiblingIndex = index;
@@ -285,6 +285,7 @@ public class DirectoryStoreGateway{
                 Node childNode = new Node(runningChildFrame.name,  node, runningChildFrame.iNodeAddress, runningChildFrame.flags);
                 if (childNode.isDirectory())
                     childNode.setFlag(Node.CNR_FLAG_MASK, true);
+                childNode.setIndex(runningChildFrame.index);
                 node.addChild(childNode);
                 runningChildFrame = getDirectoryFrame(runningChildFrame.nextSiblingIndex);
             } while (runningChildFrame.index != childFrame.index);
