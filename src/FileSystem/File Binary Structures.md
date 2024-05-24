@@ -1,23 +1,27 @@
 ### Binary Structures of Files
-
+    ALL FRAMES HAVE ENCRYPTION INFORMATION BUT IT IS ONLY SHOWN IN THE SUPERBLOCK FRAME.
     MAGIC_VALUE                 -    4 bytes (0x61717561)
     The Preset Filenames are encoded in ASCII.
     User filenames are encoded in UTF-8
 
-#### SuperBlock
-    Magic Value                 -       4 bytes                                 || Starting Index: 0
-    Flags                       -       1 byte                                  || Starting Index: 4
-    FileSystem Name (UTF-8)     -       256 bytes                               || Starting Index: 5
-    Magic Value                 -       4 bytes                                 || Starting Index: 261
-    Total DirectoryStores       -       8 bytes                                 || Starting Index: 265
-    Total DataStores            -       8 bytes                                 || Starting Index: 273     
-    Total ThumbnailStores       -       8 bytes                                 || Starting Index: 281
-    Total INodeStores           -       8 bytes                                 || Starting Index: 289
-    Total ExtentStores          -       8 Bytes                                 || Starting Index: 297
-    Total AttributeStores       -       8 Bytes                                 || Starting Index: 305
-    Magic Value                 -       4 bytes                                 || Starting Index: 313
+#### SuperBlock FULL FRAME
+    IV Value                    -       12 bytes                                || Starting Index: 0
+    Magic Value                 -       4 bytes                                 || Starting Index: 12
+    Flags                       -       1 byte                                  || Starting Index: 16
+    FileSystem Name (UTF-8)     -       256 bytes                               || Starting Index: 17
+    Magic Value                 -       4 bytes                                 || Starting Index: 273
+    Total DirectoryStores       -       8 bytes                                 || Starting Index: 277
+    Total DataStores            -       8 bytes                                 || Starting Index: 285     
+    Total ThumbnailStores       -       8 bytes                                 || Starting Index: 293
+    Total INodeStores           -       8 bytes                                 || Starting Index: 301
+    Total ExtentStores          -       8 bytes                                 || Starting Index: 309
+    Total AttributeStores       -       8 bytes                                 || Starting Index: 317
+    SALT Value                  -       16 bytes                                || Starting Index: 325
+    Magic Value                 -       4 bytes                                 || Starting Index: 341
+    TAG                         -       16 bytes                                || Starting Index: 345
     
-    Size: 317 Bytes
+    Size: 361 Bytes
+    BASE FRAME does not include the IV and TAG. Size of BASE FRAME = 333
     
 #### INode Entry
     md5 checksum                -       16 bytes                                || Starting Index: 0
@@ -57,7 +61,7 @@
 
     Size: 24 Bytes
 
-#### Modified ExtentStore Entry
+#### Modified ExtentStore Entry (In case of variable extent entries: not placed consecutively)
     Magic Value                 -       4 bytes                                 || Starting Index: 0
     Extent Address              -       8 bytes                                 || Starting Index: 4
     DataStore Index             -       8 bytes                                 || Starting Index: 12
@@ -69,13 +73,14 @@
     
 
 #### DataStore Block
+    IV Value                    -      12 bytes                                 
     MD5 hash                    -      16 bytes                                 || Starting Index: 0
     Bytes Occupied              -       2 bytes                                 || Starting Index: 16
-    Block Flags                 -       1 byte                                  || Starting Index: 18
-    Block Bitmap                -       453 bytes                               || Starting Index: 19
-    Data Bytes                  -       3624 bytes                              || Starting Index: 472
-
-    Size: 4096 bytes
+    Block Bitmap                -       450 bytes                               || Starting Index: 18
+    Data Bytes                  -       3600 bytes                              || Starting Index: 468
+    Tag                         -       16 bytes
+    BASE SIZE: 4068 bytes
+    FULL SIZE: 4096 bytes
 
 #### DataStore Entry
     Just plain data is pasted.

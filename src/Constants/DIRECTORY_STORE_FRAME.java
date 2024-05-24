@@ -1,6 +1,7 @@
 package Constants;
 public abstract class DIRECTORY_STORE_FRAME {
-    public static final int DIRECTORY_STORE_FRAME_SIZE = 325;
+    public static final int SIZE = 325;
+    public static final int FULL_SIZE = SIZE + VALUES.IV_SIZE + VALUES.TAG_SIZE;
     public static final int MAGIC_VALUE_1_INDEX = 0;
     public static final int DIRECTORY_STORE_INDEX_INDEX = 4;
     public static final int PARENT_INDEX = 12;

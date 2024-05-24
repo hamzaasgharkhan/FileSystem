@@ -23,5 +23,6 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="library" name="bc-fips-1.0.2.4" level="project" />
   </component>
 </module>

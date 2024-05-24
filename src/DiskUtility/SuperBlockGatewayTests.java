@@ -1,6 +1,6 @@
 package DiskUtility;
 
-import Constants.SUPER_BLOCK_FRAME;
+import Constants.SUPER_BLOCK_BASE_FRAME;
 import FileSystem.SuperBlockTests;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
@@ -24,7 +24,7 @@ public class SuperBlockGatewayTests {
     @Test
     @DisplayName("Sample Frame Length Valid!")
     public void sampleFrameLengthValid(){
-        Assertions.assertEquals(SUPER_BLOCK_FRAME.SUPER_BLOCK_SIZE, sampleFrame.length);
+        Assertions.assertEquals(SUPER_BLOCK_BASE_FRAME.SIZE, sampleFrame.length);
     }
 
     @Test

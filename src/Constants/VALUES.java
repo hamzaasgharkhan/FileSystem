@@ -27,5 +27,7 @@ public class VALUES {
      * Name for the SuperBlock file to be used while changing the secondary file to the primary file.
      */
     public final static String SUPER_BLOCK_TRANSITION_NAME = "J4kL1pQ8zW2sR7vX";
-
+    public final static int IV_SIZE = 12;
+    public final static int TAG_SIZE = 16;
+    public final static int SALT_SIZE = 16;
 }

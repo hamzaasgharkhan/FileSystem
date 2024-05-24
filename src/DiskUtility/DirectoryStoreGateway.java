@@ -14,6 +14,8 @@ import FileSystem.Node;
 import FileSystem.NodeTree;
 import Utilities.BinaryUtilities;
 import Utilities.GeneralUtilities;
+
+import javax.crypto.SecretKey;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.LinkedList;
@@ -56,7 +58,7 @@ public class DirectoryStoreGateway{
             this.flags = flags;
         }
         byte[] getBytes(){
-            byte[] byteArray = new byte[DIRECTORY_STORE_FRAME.DIRECTORY_STORE_FRAME_SIZE];
+            byte[] byteArray = new byte[DIRECTORY_STORE_FRAME.SIZE];
             final byte[] magicValueBytes = VALUES.MAGIC_VALUE_BYTES;
             System.arraycopy(magicValueBytes, 0, byteArray, DIRECTORY_STORE_FRAME.MAGIC_VALUE_1_INDEX, 4);
             System.arraycopy(magicValueBytes, 0, byteArray, DIRECTORY_STORE_FRAME.MAGIC_VALUE_2_INDEX, 4);
@@ -82,14 +84,16 @@ public class DirectoryStoreGateway{
             return (nextSiblingIndex != index);
         }
     }
-    File directoryStoreFile;
-    final BitMapUtility bitMapUtility;
-    public DirectoryStoreGateway(Path path, BitMapUtility bitMapUtility) throws Exception {
+    private File directoryStoreFile;
+    private final BitMapUtility bitMapUtility;
+    private final SecretKey key;
+    public DirectoryStoreGateway(Path path, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
         File file = path.resolve("directory-store").toFile();
         if (!file.exists())
             throw new Exception("Directory Store File Does Not Exist.");
         directoryStoreFile = file;
         this.bitMapUtility = bitMapUtility;
+        this.key = key;
     }
 
     /**
@@ -150,10 +154,15 @@ public class DirectoryStoreGateway{
         return new DirectoryFrame(name.trim(), index, parentIndex, iNodeAddress, parentINodeAddress, previousSiblingIndex,
                 nextSiblingIndex, childIndex, flags);
     }
-
+    /**
+     * Reads a DirectoryFrame from the DirectoryStore File.
+     * @param index Target Index
+     * @return byte array of the target directory frame
+     * @throws Exception In case of IOExceptions; or in case the file has been deleted; or in case of decryption errors.
+     */
     private byte[] __getDirectoryFrameBytes(long index) throws Exception {
         RandomAccessFile file;
-        int frameSize = DIRECTORY_STORE_FRAME.DIRECTORY_STORE_FRAME_SIZE;
+        int frameSize = DIRECTORY_STORE_FRAME.FULL_SIZE;
         byte[] byteArray = new byte[frameSize];
         try {
             file = new RandomAccessFile(directoryStoreFile, "r");
@@ -164,9 +173,9 @@ public class DirectoryStoreGateway{
             throw new Exception("Unexpected error occurred during getting directoryFrame. " +
                     "DirectoryStoreFile does not exist.");
         }
+        byteArray = Crypto.decryptBlock(byteArray, key, DIRECTORY_STORE_FRAME.SIZE);
         return byteArray;
     }
-
     /**
      * This method takes a node and places that node within the directory store file at a free index.
      * @param node The desired node to be added to the directory store file.
@@ -225,7 +234,46 @@ public class DirectoryStoreGateway{
         node.setIndex(index);
         return index;
     }
-
+    /**
+     * This method takes a node and removes the node from the FileSystem
+     * @param node Target Node
+     */
+    public void removeNode(Node node) throws Exception{
+        Node parentNode = node.getParentNode();
+        DirectoryFrame nodeFrame = getDirectoryFrame(node.getIndex());
+        DirectoryFrame parentFrame = getDirectoryFrame(parentNode.getIndex());
+        if (nodeFrame.isDirectory() && nodeFrame.childIndex != nodeFrame.index){
+            throw new Exception("Cannot Remove Non Empty Directory");
+        }
+        if (nodeFrame.nextSiblingIndex == nodeFrame.index){
+            // Node has no siblings
+            parentFrame.childIndex = parentFrame.index;
+            __updateDirectoryFrame(parentFrame);
+        } else {
+            DirectoryFrame previousSiblingFrame = getDirectoryFrame(nodeFrame.previousSiblingIndex);
+            if (nodeFrame.nextSiblingIndex == nodeFrame.previousSiblingIndex){
+                // Node only has 1 sibling
+                previousSiblingFrame.nextSiblingIndex = previousSiblingFrame.index;
+                previousSiblingFrame.previousSiblingIndex = previousSiblingFrame.index;
+                __updateDirectoryFrame(previousSiblingFrame);
+            } else {
+                // Node has at least 2 siblings
+                DirectoryFrame nextSiblingFrame = getDirectoryFrame(nodeFrame.nextSiblingIndex);
+                previousSiblingFrame.nextSiblingIndex = nextSiblingFrame.index;
+                nextSiblingFrame.previousSiblingIndex = previousSiblingFrame.index;
+                __updateDirectoryFrame(previousSiblingFrame);
+                __updateDirectoryFrame(nextSiblingFrame);
+            }
+            // If ParentFrame points to node, change it.
+            if (parentFrame.childIndex == nodeFrame.index){
+                parentFrame.childIndex = previousSiblingFrame.index;
+                __updateDirectoryFrame(parentFrame);
+            }
+        }
+        // Set Bitmap to 0
+        bitMapUtility.setIndexDirectoryStore(nodeFrame.index, false);
+        parentNode.getChildNodes(this).remove(node);
+    }
     private long __addRootNode(Node node) throws Exception{
         long index = bitMapUtility.getFreeIndexDirectoryStore();
         DirectoryFrame frame = new DirectoryFrame(
@@ -244,11 +292,9 @@ public class DirectoryStoreGateway{
         node.setIndex(index);
         return index;
     }
-
     private void __updateDirectoryFrame(DirectoryFrame frame) throws Exception{
         __writeDirectoryFrame(frame, frame.index);
     }
-
     /**
      * Writes the provided DirectoryFrame to the designated index.
      * @param frame The input DirectoryFrame
@@ -256,19 +302,20 @@ public class DirectoryStoreGateway{
      * @throws Exception If the operation was unsuccessful
      */
     private void __writeDirectoryFrame(DirectoryFrame frame, long index) throws Exception{
-        int frameSize = DIRECTORY_STORE_FRAME.DIRECTORY_STORE_FRAME_SIZE;
+        int frameSize = DIRECTORY_STORE_FRAME.FULL_SIZE;
+        byte[] byteArray = frame.getBytes();
+        byteArray = Crypto.encryptBlock(byteArray, key, DIRECTORY_STORE_FRAME.SIZE);
         RandomAccessFile file;
         try {
             file = new RandomAccessFile(directoryStoreFile, "rw");
             file.seek(index * frameSize);
-            file.write(frame.getBytes(), 0, frameSize);
+            file.write(byteArray, 0, byteArray.length);
             file.close();
         } catch (FileNotFoundException e){
             throw new Exception("Unexpected error occurred during getting directoryFrame. " +
                     "DirectoryStoreFile does not exist.");
         }
     }
-
     /**
      * This method takes a node with the CNR flag set to true and reads the children for that node.
      * @param node The required node.
@@ -298,12 +345,6 @@ public class DirectoryStoreGateway{
         }
         node.setFlag(Node.CNR_FLAG_MASK, false);
     }
-
-    public boolean writeObject(NodeTree tree){
-        // IMPLEMENT
-        return false;
-    }
-
     /**
      * This method provides a byte array containing the data within a new DirectoryStore file.
      * @return a byte array containing the bytes in a new DirectoryStore file.

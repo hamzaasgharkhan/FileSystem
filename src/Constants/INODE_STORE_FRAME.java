@@ -2,6 +2,7 @@ package Constants;
 
 public abstract class INODE_STORE_FRAME {
     public static final int SIZE = 73;
+    public static final int FULL_SIZE = SIZE + VALUES.IV_SIZE + VALUES.TAG_SIZE;
     public static final int MD5_HASH_INDEX = 0;
     public static final int INODE_ADDRESS_INDEX = 16;
     public static final int SIZE_INDEX = 24;

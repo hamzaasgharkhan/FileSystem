@@ -235,7 +235,7 @@ public class BitMapUtility {
     // Q set to 1 indicates that Quarter of the block is full
     // H set to 1 indicates that Half of the block is full (Q must also be set to 1 in this case)
     // TQ set to 1 indicates that Three Quarters of the block is full (H and Q must also be set to 1 in this case)
-    // F set to 1 indiactes that the entire block is full (given that all the other bits are also set to 1).
+    // F set to 1 indicates that the entire block is full (given that all the other bits are also set to 1).
     //
     // SPECIAL CASES
     // Case 1:
@@ -300,7 +300,7 @@ public class BitMapUtility {
         byte newBitmap;
         int totalBytes = DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE;
         if (bytesOccupied == 0){
-            newBitmap = (byte)0b00001001;
+            newBitmap = (byte)0b00001000;
         } else if (bytesOccupied < totalBytes / 4){
             newBitmap = (byte)0b00000000;
         } else if (bytesOccupied < totalBytes / 2){

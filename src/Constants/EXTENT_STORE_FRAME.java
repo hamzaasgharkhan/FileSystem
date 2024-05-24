@@ -7,6 +7,7 @@ package Constants;
  */
 public abstract class EXTENT_STORE_FRAME {
     public static final int SIZE = 24;
+    public static final int FULL_SIZE = SIZE + VALUES.IV_SIZE + VALUES.TAG_SIZE;
     public static final int MAGIC_VALUE_INDEX = 0;
     public static final int DATA_STORE_INDEX_INDEX = 4;
     public static final int DATA_STORE_OFFSET_INDEX = 12;

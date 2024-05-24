@@ -17,6 +17,8 @@ public class SuperBlock {
     private long thumbnailStores;
     private long dataStores;
     private long attributeStores;
+    private byte[] salt;
+
 
     /**
      * Constructor for SuperBlock
@@ -28,6 +30,7 @@ public class SuperBlock {
      * @param thumbnailStores Number of thumbnailStores
      * @param dataStores Number of dataStores
      * @param attributeStores attributeStores
+     * @param salt Salt Value for the FileSystem
      * @throws IllegalArgumentException If the fileSystemName is blank or exceeds 256 bytes
      */
     public SuperBlock(String fileSystemName,
@@ -37,7 +40,8 @@ public class SuperBlock {
                       byte flags,
                       long thumbnailStores,
                       long dataStores,
-                      long attributeStores) {
+                      long attributeStores,
+                      byte[] salt) {
         if (fileSystemName.isEmpty())
             throw new IllegalArgumentException("FileSystem Name Cannot Be Blank");
         if (fileSystemName.getBytes().length > 256)
@@ -50,10 +54,11 @@ public class SuperBlock {
         this.thumbnailStores = thumbnailStores;
         this.dataStores = dataStores;
         this.attributeStores = attributeStores;
+        this.salt = salt;
     }
 
     public SuperBlock(String fileSystemName){
-        this(fileSystemName, 1, 1, 1, FLAGS.DEFAULT_SUPER_BLOCK, 1, 1, 1);
+        this(fileSystemName, 1, 1, 1, FLAGS.DEFAULT_SUPER_BLOCK, 1, 1, 1, new byte[16]);
     }
 
     /**
@@ -78,6 +83,7 @@ public class SuperBlock {
             case "THUMBNAIL_STORES" -> BinaryUtilities.convertLongToBytes(thumbnailStores);
             case "DATA_STORES" -> BinaryUtilities.convertLongToBytes(dataStores);
             case "ATTRIBUTE_STORES" -> BinaryUtilities.convertLongToBytes(attributeStores);
+            case "SALT" -> this.salt;
             case "FLAGS" -> new byte[]{flags};
             default -> throw new IllegalArgumentException("No such field exists");
         };
@@ -146,4 +152,6 @@ public class SuperBlock {
     public void setAttributeStores(long attributeStores) {
         this.attributeStores = attributeStores;
     }
+    public void setSalt(byte[] salt){this.salt = salt;}
+    public byte[] getSalt(){return this.salt;}
 }

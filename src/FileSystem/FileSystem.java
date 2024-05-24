@@ -1,10 +1,11 @@
 package FileSystem;
 import Constants.FLAGS;
 import DiskUtility.*;
-import Exceptions.*;
 
-import java.io.FileOutputStream;
+import javax.crypto.SecretKey;
+import java.io.FileInputStream;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.util.LinkedList;
 
 /**
@@ -27,12 +28,13 @@ public class FileSystem {
      * It will also call the init function to create all the requisite data structures and files.
      * @return A FileSystem instance
      */
-    public static FileSystem createFileSystem(Path path, String fileSystemName) throws Exception {
+    public static FileSystem createFileSystem(Path path, String fileSystemName, String password) throws Exception {
         FileSystem fs = new FileSystem();
+        Crypto.init();
         fs.superBlock = new SuperBlock(fileSystemName);
         path = path.resolve(fileSystemName);
         try{
-            fs.gateway = new Gateway(path, fs.superBlock, true);
+            fs.gateway = new Gateway(path, fs.superBlock, password, true);
             fs.dir = new NodeTree();
             fs.gateway.addNode(fs.dir.getDirtyNodes().pop());
         } catch (Exception e){
@@ -46,8 +48,9 @@ public class FileSystem {
      * fields of the FileSystem.
      * @return true if and only if the init method was successful.
      */
-    public static FileSystem mount(Path path) throws Exception{
-        return Gateway.mountFileSystem(new FileSystem(), path);
+    public static FileSystem mount(Path path, String password) throws Exception{
+        Crypto.init();
+        return Gateway.mountFileSystem(new FileSystem(), path, password);
     }
 
     /**
@@ -127,12 +130,42 @@ public class FileSystem {
     /**
      * This method takes a path and deletes the directory the path is pointing to.
      * @param path The path of the directory
-     * @param recursive If set to true, the directory is deleted along with everything that is within the directory. If
-     *                  set to false, the directory is only deleted if it is empty. Otherwise, an exception is thrown.
-     * @throws RuntimeException In case the path does not exist, or the directory is not empty and recursive is not set to true.
+     * @param recursive Default value set to false. If set to true, the directory is deleted along with everything that
+     *                  is within the directory. If set to false, the directory is only deleted if it is empty. Otherwise,
+     *                  an exception is thrown.
+     * @throws Exception In case the path does not exist, or the directory is not empty and recursive is not set to true.
      */
-    public void removeDirectory(Path path, boolean recursive){
+    public void removeDirectory(String path, boolean recursive) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        removeDirectory(node, recursive);
+    }
 
+    /**
+     * Calls the removeDirectory method with recursive flag set to false
+     * @param path Path of the directory
+     * @throws Exception In case the Directory is not empty or other IOException occurs.
+     */
+    public void removeDirectory(String path) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        removeDirectory(node, false);
+    }
+
+    private void removeDirectory(Node node, boolean recursive) throws Exception{
+        LinkedList<Node> childNodes;
+        if (!recursive){
+            gateway.removeDirectory(node);
+        } else {
+            if (!node.isDirectory()){
+                gateway.removeNode(node);
+            } else if ((childNodes = node.getChildNodes(gateway.getDirectoryStoreGateway())).isEmpty()){
+                gateway.removeDirectory(node);
+            } else {
+                for (int i = 0; i < childNodes.size(); i++){
+                    removeDirectory(childNodes.get(0), true);
+                }
+                gateway.removeDirectory(node);
+            }
+        }
     }
 
     /**
@@ -142,6 +175,8 @@ public class FileSystem {
      */
     public void removeNode(String path) throws Exception{
         Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        if (node.isDirectory())
+            throw new Exception("Node is a directory.");
         gateway.removeNode(node);
     }
 
@@ -150,7 +185,7 @@ public class FileSystem {
      * @param path The path of the required file
      * @return A FileOutputStream for the requested File.
      */
-    public FileOutputStream openFile(String path){
+    public FileInputStream openFile(String path){
         // IMPLEMENT
         return null;
     }
