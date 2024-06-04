@@ -7,6 +7,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.LinkedList;
+import java.util.Random;
 
 /**
  * This class provides an interface between the DataStore files and the rest of the filesystem.
@@ -193,44 +194,35 @@ class DataStoreGateway {
         // pointer within the inputBlock
         int pointer = 0;
         // Contains the data of the user input file
-        byte[] inputBlock = new byte[4096];
+        byte[] inputBlock = new byte[DATA_STORE_BLOCK_FRAME.FULL_SIZE];
+        // Number of inputBlocks that have been read.
+        int inputBlocksRead = 0;
         // Contains a data block within data-store
         byte[] dataBlock;
         bytesToWrite = fileSize = file.length();
         if (fileSize == 0L)
             throw new Exception("Cannot Call addFile on a directory.");
+        try {
+            inputFile = new RandomAccessFile(file, "r");
+        } catch (FileNotFoundException e){
+            throw new Exception("inputFile Not Found." + e.getMessage());
+        }
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // FIX THE TRY CATCH. NOT EVERYTHING SHOULD BE IN THE TRY CATCH.
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        try {
-            inputFile = new RandomAccessFile(file, "r");
-            if (fileSize > 4096){
-                inputFile.readFully(inputBlock, 0, 4096);
-            } else {
-                inputFile.readFully(inputBlock, 0, (int)fileSize);
-            }
-        } catch (FileNotFoundException e){
-            throw new Exception("File being added by user not found or data-store file not found." + e.getMessage());
-        } catch (EOFException e){
-            throw new Exception("Reading more bytes than the file contains." + e.getMessage());
-        } catch (IOException e){
-            throw new Exception("Unable to read data-store file or user input file." + e.getMessage());
-        } catch (Exception e){
-            throw new Exception("Unknown error." + e.getMessage());
+        if (fileSize >= DATA_STORE_BLOCK_FRAME.FULL_SIZE){
+            __fillInputBlock(inputFile, inputBlock, inputBlocksRead, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
+        } else {
+            __fillInputBlock(inputFile, inputBlock, inputBlocksRead, (int)fileSize);
         }
-        // GET RUNS. WRITE TO THOSE RUNS. KEEP WRITING AND GETTING NEW INDEXES TILL ENTIRE WRITE IS DONE.
-        // CREATE APPROPRIATE EXTENT ENTRIES
-        // CREATE AN APPROPRIATE INODE
-        // RETURN THE INODE
+        inputBlocksRead++;
         while (bytesToWrite > 0){
-            int bytesWrittenInRunningBlock = 0;
+            int bytesWrittenFromRunningInputBlock = 0;
             dataBlock = new byte[DATA_STORE_BLOCK_FRAME.SIZE];
             index = bitMapUtility.getFreeIndexDataStore(bytesToWrite);
-            // If the dataBlock is allocated and exists on disk then read it from disk otherwise work with the empty
-            // block.
             if (bitMapUtility.isIndexOccupiedDataStore(index)){
                 try {
-                    __updateDataBlockArray(dataBlock, index);
+                        __updateDataBlockArray(dataBlock, index);
                 } catch (EOFException e){
                     throw new Exception("Error in dataBlock file. Either the provided index: " + index + " does not exist" +
                             "in the data-store file or the contents of the data-store file have been corrupted." + e.getMessage());
@@ -247,70 +239,62 @@ class DataStoreGateway {
             if (runs.length % 2 != 0)
                 throw new Exception("Unexpected Error. Runs should always have even number of elements. Pairs of" +
                         "start and end indices. Currently runs has an odd number of elements.");
-            int start, end, length;
-            for (int i = 0; i < runs.length; i+=2) {
+            int start, length;
+            for (int i = 0; i < runs.length; i+=2){
                 start = runs[i];
-                length = runs[i + 1];
-                if ((((pointer + bytesToWrite) < DATA_STORE_BLOCK_FRAME.SIZE) ||
-                        (((pointer + bytesToWrite) > DATA_STORE_BLOCK_FRAME.SIZE) && ((pointer + length) < DATA_STORE_BLOCK_FRAME.SIZE)))) {
-                    // Case 1: All the data is within the buffer, no more data needs to be read from the file.
-                    // If the run can accommodate all the data that is left in the buffer, use the parts of the run
-                    // that are necessary and leave the rest of the run empty.
-                    // Case 2: All the data of the file is not within the buffer, hence the buffer will need to be
-                    // refreshed at some point. However, all the data that the current run can accommodate is in the
-                    // buffer, hence we do not need to refresh the buffer for this particular run.
-                    // In both cases, the buffer does not need to be updated. The only thing that needs to
-                    // be checked is whether we need to write `length` bytes to the dataBlock or `bytesToWrite` bytes
-                    // to the dataBlock.
-                    // Set the smaller value of the two to localBytesToWrite
-                    int localBytesToWrite = (length > bytesToWrite) ? (int) bytesToWrite : length;
-                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX +  start, localBytesToWrite);
-                    // The bytes that are written will be set to 0 within the inputBlock array. Fix this issue.
-                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite, true);
-                    bytesOccupied += (short) localBytesToWrite;
-                    bytesWrittenInRunningBlock += localBytesToWrite;
-                    pointer += localBytesToWrite;
-                    extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
-                } else if (((pointer + bytesToWrite) > DATA_STORE_BLOCK_FRAME.SIZE) && (pointer + length) >= DATA_STORE_BLOCK_FRAME.SIZE) {
-                    // In this case, the buffer needs to be refreshed.
-                    // The run can accommodate more than what the current buffer has. Buffer needs to be updated.
-                    // First copy the data that is in the dataBlock
-                    // Set to the smaller value of the two: length of the run and bytesToWrite.
-                    int localBytesToWrite = (length > bytesToWrite) ? (int) bytesToWrite : length;
-                    int localBytesWritten = DATA_STORE_BLOCK_FRAME.SIZE - pointer;
-                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX +  start, localBytesWritten);
-                    // Still more than 4096 bytes left in the file to read
-                    try {
-                        if (bytesToWrite - localBytesWritten > 4096) {
-                            inputFile.readFully(inputBlock, 0, 4096);
-                        } else {
-                            inputFile.readFully(inputBlock, 0, (int) bytesToWrite - localBytesWritten);
+                length = runs[i+1];
+                // Calculate the number of bytes that will be written to the current RUN.
+                int bytesWritableToCurrentRun = (length < bytesToWrite) ? length: (int)bytesToWrite;
+                int bytesWrittenToCurrentRun = 0;
+                while (bytesWrittenToCurrentRun < bytesWritableToCurrentRun){
+                    int localBytesWritten = 0;  // Temporary variable to maintain the number of bytes written
+                    int inputBlockLength = inputBlock.length;
+                    int dataBlockIndex = DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX + start;
+                    // CASE 1: inputBlock does not need to be refreshed.
+                    if (pointer + bytesWritableToCurrentRun <= inputBlockLength){
+                        System.arraycopy(inputBlock, pointer, dataBlock, dataBlockIndex, bytesWritableToCurrentRun);
+                        localBytesWritten += bytesWritableToCurrentRun;
+                        bytesWrittenToCurrentRun += localBytesWritten;
+                        bytesToWrite -= localBytesWritten;
+                        pointer += localBytesWritten;
+                        // ENSURE THAT THE pointer is set to 0 when it reaches inputBlockLength
+                        if (pointer == DATA_STORE_BLOCK_FRAME.FULL_SIZE){
+                            if (bytesToWrite >= DATA_STORE_BLOCK_FRAME.FULL_SIZE)
+                                __fillInputBlock(inputFile, inputBlock, inputBlocksRead, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
+                            else
+                                __fillInputBlock(inputFile, inputBlock, inputBlocksRead, (int)bytesToWrite);
+                            inputBlocksRead++;
+                            pointer = 0;
                         }
-                    } catch (EOFException e){
-                        throw new Exception("Request to read more bytes than the file has left." + e.getMessage());
-                    } catch (IOException e){
-                        throw new Exception("Unable to access the contents of the user input file." + e.getMessage());
+                    } else {
+                        // CASE 2: inputBlock does need to be refreshed
+                        System.arraycopy(inputBlock, pointer, dataBlock, dataBlockIndex + localBytesWritten, inputBlockLength - pointer);
+                        localBytesWritten += inputBlockLength - pointer;
+                        bytesWrittenToCurrentRun += localBytesWritten;
+                        bytesToWrite -= localBytesWritten;
+                        if (bytesToWrite >= DATA_STORE_BLOCK_FRAME.FULL_SIZE)
+                            __fillInputBlock(inputFile, inputBlock, inputBlocksRead, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
+                        else
+                            __fillInputBlock(inputFile, inputBlock, inputBlocksRead, (int)bytesToWrite);
+                        inputBlocksRead++;
+                        pointer = 0;
+                        if (bytesWritableToCurrentRun - bytesWrittenToCurrentRun > 0){
+                            System.arraycopy(inputBlock, pointer, dataBlock, dataBlockIndex + localBytesWritten, bytesWritableToCurrentRun - bytesWrittenToCurrentRun);
+                            localBytesWritten += bytesWritableToCurrentRun - bytesWrittenToCurrentRun;
+                            bytesToWrite -= bytesWritableToCurrentRun - bytesWrittenToCurrentRun;
+                            bytesWrittenToCurrentRun += bytesWritableToCurrentRun - bytesWrittenToCurrentRun;;
+                        }
                     }
-                    pointer = 0;
-                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX + start + localBytesWritten, localBytesToWrite - localBytesWritten);
-                    pointer += localBytesToWrite - localBytesWritten;
-                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite, true);
-                    bytesOccupied += (short) localBytesToWrite;
-                    bytesWrittenInRunningBlock += localBytesToWrite;
-                    extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
-                } else {
-                    throw new Exception("BUG. THIS EXCEPTION SHOULD NEVER BE THROWN.");
+                    bytesOccupied += (short) localBytesWritten;
                 }
-                bytesToWrite -= bytesWrittenInRunningBlock;
+                extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, bytesWrittenToCurrentRun));
+                DataBlock.setRunOccupied(dataBlock, start, bytesWrittenToCurrentRun, true);
             }
             DataBlock.setBytesOccupied(dataBlock, bytesOccupied);
-            // CREATE FUNCTIONALITY TO ADD THE MD5 HASH for the data block.
-            // ALSO CHECK FOR ANY FLAGS IF POSSIBLE
-            // DataBlock.setHash()
+//            DataBlock.setHash();
             bitMapUtility.setIndexDataStore(index, bytesOccupied); // FIX THIS METHOD TO TAKE THE NUMBER OF BYTE THAT ARE OCCUPIED BY THE BLOCK NOW. THE BITMAP SHOULD DECIDE TH EBITMAP
             try {
                 __updateDataBlockFile(dataBlock, index);
-
             } catch (IOException e){
                 throw new Exception("Error with accessing and writing to the data-store file." + e.getMessage());
             }
@@ -323,6 +307,21 @@ class DataStoreGateway {
         return ExtentStoreGateway.ExtentFrame.getCompactExtentList(extentFramesLinkedList);
     }
 
+    private void __fillInputBlock(RandomAccessFile inputFile, byte[] inputBlock, int inputBlocksRead, int bytesToRead) throws Exception{
+        try {
+            inputFile.seek((long) DATA_STORE_BLOCK_FRAME.FULL_SIZE * inputBlocksRead);
+            inputFile.readFully(inputBlock, 0, bytesToRead);
+        } catch (FileNotFoundException e){
+            throw new Exception("File being added by user not found or data-store file not found." + e.getMessage());
+        } catch (EOFException e){
+            throw new Exception("Reading more bytes than the file contains." + e.getMessage());
+        } catch (IOException e){
+            throw new Exception("Unable to read data-store file or user input file." + e.getMessage());
+        } catch (Exception e){
+            throw new Exception("Unknown error." + e.getMessage());
+        }
+    }
+
     public void removeNode(LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames) throws Exception{
         // Set bitmaps of individual blocks within datastore
         // Update byteOccupied of each block
@@ -333,9 +332,9 @@ class DataStoreGateway {
             long startBlockIndex, endBlockIndex;
             int startBlockOffset, endBlockOffset;
             startBlockIndex = extentFrame.dataStoreIndex;
-            endBlockIndex = extentFrame.dataStoreIndex + ((extentFrame.offset + extentFrame.length) / DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE);
+            endBlockIndex = extentFrame.dataStoreIndex + ((extentFrame.offset + extentFrame.length) / DATA_STORE_BLOCK_FRAME.DATA_SIZE);
             startBlockOffset = extentFrame.offset;
-            endBlockOffset = (int) ((extentFrame.offset + extentFrame.length) % DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE);
+            endBlockOffset = (int) ((extentFrame.offset + extentFrame.length) % DATA_STORE_BLOCK_FRAME.DATA_SIZE);
             __updateDataBlockArray(dataBlock, startBlockIndex);
             if (startBlockIndex == endBlockIndex){
                 // The entire extent is within the same block.
@@ -347,7 +346,7 @@ class DataStoreGateway {
             } else {
                 // The extent spans multiple blocks
                 // FIRST: Delete everything in the first block from the offset to the end
-                int length = DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE - startBlockOffset;
+                int length = DATA_STORE_BLOCK_FRAME.DATA_SIZE - startBlockOffset;
                 DataBlock.setRunOccupied(dataBlock, startBlockOffset, length, false);
                 short newBytesOccupied = (short)(DataBlock.getBytesOccupied(dataBlock) - length);
                 DataBlock.setBytesOccupied(dataBlock, newBytesOccupied);
@@ -356,7 +355,7 @@ class DataStoreGateway {
                 for (long i = startBlockIndex + 1; i < endBlockIndex; i++){
                     // SECOND: Clear all the blocks in between
                     __updateDataBlockArray(dataBlock, i);
-                    DataBlock.setRunOccupied(dataBlock, 0, DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE, false);
+                    DataBlock.setRunOccupied(dataBlock, 0, DATA_STORE_BLOCK_FRAME.DATA_SIZE, false);
                     DataBlock.setBytesOccupied(dataBlock, (short)0);
                     __updateDataBlockFile(dataBlock, i);
                     bitMapUtility.setIndexDataStore(i, (short)0);
@@ -456,3 +455,116 @@ class DataStoreGateway {
         return byteArray;
     }
 }
+
+
+/**
+ *
+
+
+
+
+
+
+
+
+ // GET RUNS. WRITE TO THOSE RUNS. KEEP WRITING AND GETTING NEW INDEXES TILL ENTIRE WRITE IS DONE.
+ // CREATE APPROPRIATE EXTENT ENTRIES
+ // CREATE AN APPROPRIATE INODE
+ // RETURN THE INODE
+ //        while (bytesToWrite > 0){
+ //            int bytesWrittenInRunningBlock = 0;
+ //            dataBlock = new byte[DATA_STORE_BLOCK_FRAME.SIZE];
+ //            index = bitMapUtility.getFreeIndexDataStore(bytesToWrite);
+ //            // If the dataBlock is allocated and exists on disk then read it from disk otherwise work with the empty
+ //            // block.
+ //            if (bitMapUtility.isIndexOccupiedDataStore(index)){
+ //                try {
+ //                    __updateDataBlockArray(dataBlock, index);
+ //                } catch (EOFException e){
+ //                    throw new Exception("Error in dataBlock file. Either the provided index: " + index + " does not exist" +
+ //                            "in the data-store file or the contents of the data-store file have been corrupted." + e.getMessage());
+ //                } catch (IOException e){
+ //                    throw new Exception("Unable to access the contents of data-store file."  + e.getMessage());
+ //                }
+ //            }
+ //            bytesOccupied = DataBlock.getBytesOccupied(dataBlock);
+ //            int[] runs = DataBlock.getRuns(dataBlock);
+ //            if (runs.length == 0)
+ //                throw new Exception("Unexpected Error. Code Has a bug. This Exception should never be printed." +
+ //                        "The index provided by the bitmapUtility does not have a free byte." +
+ //                        "Possible reasons: Bug in Code, Inconsistency between writes and reads");
+ //            if (runs.length % 2 != 0)
+ //                throw new Exception("Unexpected Error. Runs should always have even number of elements. Pairs of" +
+ //                        "start and end indices. Currently runs has an odd number of elements.");
+ //            int start, length;
+ //            for (int i = 0; i < runs.length; i+=2) {
+ //                start = runs[i];
+ //                length = runs[i + 1];
+ //                if (((pointer + bytesToWrite) <= DATA_STORE_BLOCK_FRAME.FULL_SIZE) ||
+ //                        ((pointer + length) <= DATA_STORE_BLOCK_FRAME.FULL_SIZE)) {
+ //                    // Case 1: All the data is within the inputFile buffer, no more data needs to be read from the file.
+ //                    // If the run can accommodate all the data that is left in the buffer, use the parts of the run
+ //                    // that are necessary and leave the rest of the run empty.
+ //                    // Case 2: All the data of the file is not within the buffer, hence the buffer will need to be
+ //                    // refreshed at some point. However, all the data that the current run can accommodate is in the
+ //                    // buffer, hence we do not need to refresh the buffer for this particular run.
+ //                    // In both cases, the buffer does not need to be updated. The only thing that needs to
+ //                    // be checked is whether we need to write `length` bytes to the dataBlock or `bytesToWrite` bytes
+ //                    // to the dataBlock.
+ //                    // Set the smaller value of the two to localBytesToWrite
+ //                    int localBytesToWrite = (length < bytesToWrite) ? length : (int)bytesToWrite;
+ //                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX +  start, localBytesToWrite);
+ //                    // The bytes that are written will be set to 0 within the inputBlock array. Fix this issue.
+ //                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite, true);
+ //                    bytesOccupied += (short) localBytesToWrite;
+ //                    bytesWrittenInRunningBlock += localBytesToWrite;
+ //                    pointer += localBytesToWrite;
+ //                    // If the pointer is set to the end of the block, reset the pointer
+ //                    if (pointer == DATA_STORE_BLOCK_FRAME.FULL_SIZE)
+ //                        pointer = 0;
+ //                    extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
+ //                } else if (((pointer + bytesToWrite) > DATA_STORE_BLOCK_FRAME.DATA_SIZE) && (pointer + length) > DATA_STORE_BLOCK_FRAME.DATA_SIZE) { // There was a greater than or equal to in the second condition. why?
+ //                    // In this case, the buffer needs to be refreshed.
+ //                    // The run can accommodate more than what the current buffer has. Buffer needs to be updated.
+ //                    // First copy the data that is in the dataBlock
+ //                    // Set to the smaller value of the two: length of the run and bytesToWrite.
+ //                    int localBytesToWrite = (length < bytesToWrite) ? length : (int) bytesToWrite;
+ //                    int localBytesWritten = DATA_STORE_BLOCK_FRAME.DATA_SIZE - pointer; // Number of bytes that can be written to the given block
+ //                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX +  start, localBytesWritten);
+ //                    // Still more than 4096 bytes left in the file to read
+ //                    try {
+ //                        if (bytesToWrite - localBytesWritten > 4096) {
+ //                            inputFile.readFully(inputBlock, 0, 4096);
+ //                        } else {
+ //                            inputFile.readFully(inputBlock, 0, (int) bytesToWrite - localBytesWritten);
+ //                        }
+ //                    } catch (EOFException e){
+ //                        throw new Exception("Request to read more bytes than the file has left." + e.getMessage());
+ //                    } catch (IOException e){
+ //                        throw new Exception("Unable to access the contents of the user input file." + e.getMessage());
+ //                    }
+ //                    pointer = 0;
+ //                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX + start + localBytesWritten, localBytesToWrite - localBytesWritten);
+ //                    pointer += localBytesToWrite - localBytesWritten;
+ //                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite, true);
+ //                    bytesOccupied += (short) localBytesToWrite;
+ //                    bytesWrittenInRunningBlock += localBytesToWrite;
+ //                    extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
+ //                } else {
+ //                    throw new Exception("BUG. THIS EXCEPTION SHOULD NEVER BE THROWN.");
+ //                }
+ //                bytesToWrite -= bytesWrittenInRunningBlock;
+ //            }
+ //            DataBlock.setBytesOccupied(dataBlock, bytesOccupied);
+ //            // CREATE FUNCTIONALITY TO ADD THE MD5 HASH for the data block.
+ //            // ALSO CHECK FOR ANY FLAGS IF POSSIBLE
+ //            // DataBlock.setHash()
+ //            bitMapUtility.setIndexDataStore(index, bytesOccupied); // FIX THIS METHOD TO TAKE THE NUMBER OF BYTE THAT ARE OCCUPIED BY THE BLOCK NOW. THE BITMAP SHOULD DECIDE TH EBITMAP
+ //            try {
+ //                __updateDataBlockFile(dataBlock, index);
+ //
+ //            } catch (IOException e){
+ //                throw new Exception("Error with accessing and writing to the data-store file." + e.getMessage());
+ //            }
+ //        }
+ */

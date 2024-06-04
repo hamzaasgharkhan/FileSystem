@@ -58,8 +58,8 @@
     DataStore Index             -       8 bytes                                 || Starting Index: 4
     DataStore Offset            -       4 bytes                                 || Starting Index: 12
     Length                      -       8 bytes                                 || Starting Index: 16 
-
-    Size: 24 Bytes
+    Next Extent Entry Address   -       8 bytes                                 || Starting Index: 24
+    Size: 32 Bytes
 
 #### Modified ExtentStore Entry (In case of variable extent entries: not placed consecutively)
     Magic Value                 -       4 bytes                                 || Starting Index: 0

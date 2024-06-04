@@ -4,7 +4,6 @@ import Constants.DATA_STORE_BLOCK_FRAME;
 import Constants.EXTENT_STORE_FRAME;
 import Constants.VALUES;
 import Utilities.BinaryUtilities;
-import Utilities.GeneralUtilities;
 
 import javax.crypto.SecretKey;
 import java.io.File;
@@ -31,11 +30,13 @@ class ExtentStoreGateway {
         long dataStoreIndex;
         int offset;
         long length;
+        long nextAddress;
         ExtentFrame(long dataStoreIndex, int offset, long length) {
             this.dataStoreIndex = dataStoreIndex;
             this.offset = offset;
             this.length = length;
         }
+        void setNextAddress(long nextAddress){this.nextAddress = nextAddress;}
 
         /**
          * This method takes an extentFrame and calculates the index of the block after it along with the byte index of
@@ -45,8 +46,8 @@ class ExtentStoreGateway {
          * the first byte index of the block.
          */
         static long[] getNextBlock(ExtentFrame extentFrame){
-            long additionalBlocks = (extentFrame.length + extentFrame.offset) / DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE;
-            long lastByteIndex = (extentFrame.length + extentFrame.offset) % DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE;
+            long additionalBlocks = (extentFrame.length + extentFrame.offset) / DATA_STORE_BLOCK_FRAME.DATA_SIZE;
+            long lastByteIndex = (extentFrame.length + extentFrame.offset) % DATA_STORE_BLOCK_FRAME.DATA_SIZE;
             return new long[]{extentFrame.dataStoreIndex + additionalBlocks, lastByteIndex};
         }
         /**
@@ -114,42 +115,53 @@ class ExtentStoreGateway {
         // To access the extentStore file.
         RandomAccessFile file;
         // Create a new byte array to hold all the entries of the extentFrames LinkedList.
-        byte[] byteArray = new byte[EXTENT_STORE_FRAME.FULL_SIZE * extentFrames.size()];
+        byte[] byteArray = new byte[EXTENT_STORE_FRAME.FULL_SIZE];
         // Fill the byte array with the extent entries.
-        for (int i = 0; i < extentFrames.size(); i++){
-            __addExtentEntry(byteArray, extentFrames.get(i), i);
-        }
-        // Get the appropriate index in the extentStore for the extent based on its size.
-        long index = bitMapUtility.getFreeIndexExtentStore();
         try{
             file = new RandomAccessFile(extentStoreFile, "rw");
         } catch (FileNotFoundException e){
             throw new Exception("Error opening extentStore file. File not found." + e.getMessage());
         }
-        try{
-            file.seek(index * EXTENT_STORE_FRAME.SIZE);
-            file.write(byteArray);
+        long firstIndex = 0, index = 0, nextIndex = 0;
+        int extentFramesSize = extentFrames.size();
+        if (extentFramesSize == 1){
+            firstIndex = index = bitMapUtility.getFreeIndexExtentStore();
+            nextIndex = index;
+            __addExtentEntry(byteArray, extentFrames.get(0), nextIndex);
+            __writeExtentFrameToFile(file, byteArray, index);
             bitMapUtility.setIndexExtentStore(index, true);
-        } catch (IOException e){
-            throw new Exception("IOError occurred while accessing extentStore file." + e.getMessage());
+        } else {
+            for (int i = 0; i < extentFramesSize; i++){
+                if (i == 0) {
+                    firstIndex = index = bitMapUtility.getFreeIndexExtentStore();
+                    nextIndex = bitMapUtility.getFreeIndexExtentStore();
+                } else if (i + 1 < extentFramesSize){
+                    index = nextIndex;
+                    nextIndex = bitMapUtility.getFreeIndexExtentStore();
+                } else {
+                    index = nextIndex;
+                }
+                __addExtentEntry(byteArray, extentFrames.get(i), nextIndex);
+                __writeExtentFrameToFile(file, byteArray, index);
+                bitMapUtility.setIndexExtentStore(index, true);
+            }
         }
         try {
             file.close();
         } catch (IOException e){
             throw new Exception("IOError occurred while closing extentStore file." + e.getMessage());
         }
-        return new long[]{index, extentFrames.size()};
+        return new long[]{firstIndex, extentFrames.size()};
     }
 
     /**
-     * This method takes a byteArray and an extentFrame. It adds the extentFrame to the specified index.
+     * This method takes a byteArray and an extentFrame. It fills the byteArray with the contents of the extentFrame
      * @param byteArray The byteArray containing the extents.
      * @param extentFrame The target extentFrame
-     * @param index The target index within the byteArray
+     * @param nextAddress Address of the next extent in the run
      */
-    private void __addExtentEntry(byte[] byteArray, ExtentFrame extentFrame, int index) throws Exception{
+    private void __addExtentEntry(byte[] byteArray, ExtentFrame extentFrame, long nextAddress) throws Exception{
         byte[] extentBytes = new byte[EXTENT_STORE_FRAME.SIZE];
-        index = index * EXTENT_STORE_FRAME.SIZE;
         System.arraycopy(
                 VALUES.MAGIC_VALUE_BYTES,
                 0,
@@ -175,10 +187,16 @@ class ExtentStoreGateway {
                 EXTENT_STORE_FRAME.LENGTH_INDEX,
                 8);
         System.arraycopy(
+                BinaryUtilities.convertLongToBytes(nextAddress),
+                0,
+                extentBytes,
+                EXTENT_STORE_FRAME.NEXT_EXTENT_ADDRESS_INDEX,
+                8);
+        System.arraycopy(
                 Crypto.encryptBlock(extentBytes, key, EXTENT_STORE_FRAME.SIZE),
                 0,
                 byteArray,
-                index,
+                0,
                 EXTENT_STORE_FRAME.FULL_SIZE
         );
     }
@@ -192,58 +210,76 @@ class ExtentStoreGateway {
      */
     public LinkedList<ExtentFrame> getExtentFrames(long extentStoreAddress, long extentCount) throws Exception{
         LinkedList<ExtentFrame> extentFrames = new LinkedList<ExtentFrame>();
-        byte[] byteArray = new byte[(int) (extentCount * EXTENT_STORE_FRAME.FULL_SIZE)];
+        byte[] byteArray = new byte[EXTENT_STORE_FRAME.FULL_SIZE];
         RandomAccessFile file;
+        long index = 0;
         try{
             file = new RandomAccessFile(extentStoreFile, "r");
         } catch (FileNotFoundException e){
             throw new Exception("Error opening extentStore file. File not found." + e.getMessage());
         }
-        try{
-            file.seek(extentStoreAddress * EXTENT_STORE_FRAME.FULL_SIZE);
-            file.readFully(byteArray);
-        } catch (IOException e){
-            throw new Exception("IOError occurred while accessing extentStore file." + e.getMessage());
+        for (int i = 0; i < extentCount; i++){
+            if (i == 0)
+                index = extentStoreAddress;
+            try{
+                file.seek(index * EXTENT_STORE_FRAME.FULL_SIZE);
+                file.readFully(byteArray);
+            } catch (IOException e){
+                throw new Exception("IOError occurred while accessing extentStore file." + e.getMessage());
+            }
+            ExtentFrame extentFrame = __getExtentEntry(byteArray);
+            long nextAddress = extentFrame.nextAddress;
+            if (i != extentCount - 1 && index == nextAddress){
+                throw new Exception("Mismatch between INodeStore and ExtentStore. Size of Runs Not Identical.");
+            }
+            index = nextAddress;
+            extentFrames.add(extentFrame);
         }
         try {
             file.close();
         } catch (IOException e){
             throw new Exception("IOError occurred while closing extentStore file." + e.getMessage());
         }
-        for (int i = 0; i < extentCount; i++){
-            extentFrames.add(__getExtentEntry(byteArray, i));
-        }
         return extentFrames;
     }
 
     /**
-     * This method takes a byteArray and an index within the byteArray to return an ExtentFrame at that address
-     * @param byteArray Target ByteArray
-     * @param index Index within the byteArray
+     * This method takes a byteArray containing the encrypted contents of an ExtentFrame and returns the associated
+     * ExtentFrame
+     * @param byteArray ByteArray containing the Encrypted Form of an ExtentFrame
      * @return The Target Extent Frame
      */
-    private ExtentFrame __getExtentEntry(byte[] byteArray, int index) throws Exception{
-        index = index * EXTENT_STORE_FRAME.FULL_SIZE;
-        byte[] extentBytes = Arrays.copyOfRange(byteArray, index, index + EXTENT_STORE_FRAME.FULL_SIZE);
-        extentBytes = Crypto.decryptBlock(extentBytes, key, EXTENT_STORE_FRAME.SIZE);
-        long dataStoreIndex, length;
+    private ExtentFrame __getExtentEntry(byte[] byteArray) throws Exception{
+        byteArray = Crypto.decryptBlock(byteArray, key, EXTENT_STORE_FRAME.SIZE);
+        long dataStoreIndex, length, nextAddress;
         int offset;
-        dataStoreIndex = BinaryUtilities.convertBytesToLong(extentBytes, EXTENT_STORE_FRAME.DATA_STORE_INDEX_INDEX);
-        length = BinaryUtilities.convertBytesToLong(extentBytes, EXTENT_STORE_FRAME.LENGTH_INDEX);
-        offset = BinaryUtilities.convertBytesToInt(extentBytes, EXTENT_STORE_FRAME.DATA_STORE_OFFSET_INDEX);
-        return new ExtentFrame(dataStoreIndex, offset, length);
+        dataStoreIndex = BinaryUtilities.convertBytesToLong(byteArray, EXTENT_STORE_FRAME.DATA_STORE_INDEX_INDEX);
+        length = BinaryUtilities.convertBytesToLong(byteArray, EXTENT_STORE_FRAME.LENGTH_INDEX);
+        offset = BinaryUtilities.convertBytesToInt(byteArray, EXTENT_STORE_FRAME.DATA_STORE_OFFSET_INDEX);
+        nextAddress = BinaryUtilities.convertBytesToLong(byteArray, EXTENT_STORE_FRAME.NEXT_EXTENT_ADDRESS_INDEX);
+        ExtentFrame extentFrame = new ExtentFrame(dataStoreIndex, offset, length);
+        extentFrame.setNextAddress(nextAddress);
+        return extentFrame;
+    }
+
+    private void __writeExtentFrameToFile(RandomAccessFile file, byte[] byteArray, long index) throws Exception{
+        try{
+            file.seek(index * EXTENT_STORE_FRAME.FULL_SIZE);
+            file.write(byteArray);
+        } catch (IOException e){
+            throw new Exception("IOError occurred while accessing extentStore file." + e.getMessage());
+        }
     }
 
     /**
      * This method takes the ExtentStore Address and the ExtentCount to delete the target Extent Entry from the Extent
      * Store
-     * @param extentStoreAddress Address of the target Extent
-     * @param extentCount Number of Extent Entries
+     * @param extentFrames LinkedList of the ExtentFrames that need to be removed.
      */
-    public void removeExtentEntry(long extentStoreAddress, long extentCount){
+    public void removeExtentEntry(LinkedList<ExtentFrame> extentFrames){
         // Only need to change the bitmap utility to show the occupied locations as empty and that's it.
-        for (long i = 0L; i < extentCount; i++){
-            bitMapUtility.setIndexExtentStore(extentStoreAddress + i, false);
+        for (ExtentFrame extentFrame : extentFrames) {
+            bitMapUtility.setIndexExtentStore(extentFrame.nextAddress, false);
         }
     }
 }

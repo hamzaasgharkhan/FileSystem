@@ -11,7 +11,7 @@ public class DataStoreGatewayTests {
     @DisplayName("DATABLOCK getruns()  -> Empty Block")
     public void getRuns(){
         byte[] block = new byte[4096];
-        int[] expected = {0, DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE};
+        int[] expected = {0, DATA_STORE_BLOCK_FRAME.DATA_SIZE};
         int[] output = DataStoreGateway.DataBlock.getRuns(block);
         Assertions.assertArrayEquals(expected, output);
     }
@@ -23,7 +23,7 @@ public class DataStoreGatewayTests {
         byte[] expected = new byte[4096];
         for (int i = DATA_STORE_BLOCK_FRAME.BITMAP_INDEX; i < DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX; i++)
             expected[i] = -1;
-        DataStoreGateway.DataBlock.setRunOccupied(block, 0, DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE, true);
+        DataStoreGateway.DataBlock.setRunOccupied(block, 0, DATA_STORE_BLOCK_FRAME.DATA_SIZE, true);
         Assertions.assertArrayEquals(expected, block);
     }
 

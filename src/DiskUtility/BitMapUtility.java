@@ -2,7 +2,6 @@ package DiskUtility;
 
 import Constants.DATA_STORE_BLOCK_FRAME;
 
-import javax.management.RuntimeMBeanException;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -298,7 +297,7 @@ public class BitMapUtility {
             default -> throw new RuntimeException("Invalid Store Name for Half Bitmap");
         };
         byte newBitmap;
-        int totalBytes = DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_DATA_SIZE;
+        int totalBytes = DATA_STORE_BLOCK_FRAME.DATA_SIZE;
         if (bytesOccupied == 0){
             newBitmap = (byte)0b00001000;
         } else if (bytesOccupied < totalBytes / 4){

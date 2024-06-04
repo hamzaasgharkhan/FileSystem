@@ -166,7 +166,7 @@ public class Gateway {
         NodeEntry nodeEntry = __getNodeDetails(node);
         dataStoreGateway.removeNode(nodeEntry.extentFrames);
         thumbnailStoreGateway.removeNode(nodeEntry.iNode.getThumbnailStoreAddress());
-        extentStoreGateway.removeExtentEntry(nodeEntry.iNode.getExtentStoreAddress(), nodeEntry.iNode.getExtentCount());
+        extentStoreGateway.removeExtentEntry(nodeEntry.extentFrames);
         iNodeStoreGateway.removeINode(nodeEntry.iNode.getiNodeAddress());
         directoryStoreGateway.removeNode(node);
     }
