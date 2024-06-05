@@ -13,5 +13,4 @@ public abstract class EXTENT_STORE_FRAME {
     public static final int DATA_STORE_OFFSET_INDEX = 12;
     public static final int LENGTH_INDEX = 16;
     public static final int NEXT_EXTENT_ADDRESS_INDEX = 24;
-
 }
