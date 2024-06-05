@@ -23,11 +23,11 @@ import java.util.LinkedList;
  * It allows provides the ability to create other Gateway Objects.
  */
 public class Gateway {
-    public static class NodeEntry{
+    static class NodeEntry{
         Node node;
         INode iNode;
         LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames;
-        public NodeEntry(Node node, INode iNode, LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames){
+        NodeEntry(Node node, INode iNode, LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames){
             this.node = node;
             this.iNode = iNode;
             this.extentFrames = extentFrames;
@@ -150,6 +150,7 @@ public class Gateway {
     public DirectoryStoreGateway getDirectoryStoreGateway() {
         return directoryStoreGateway;
     }
+    public DataStoreGateway getDataStoreGateway() {return dataStoreGateway;}
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //  Adding actual data files.
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -187,7 +188,7 @@ public class Gateway {
      * @param node The target Node
      * @return NodeEntry object containing the details regarding the node.
      */
-    private NodeEntry __getNodeDetails(Node node) throws Exception{
+    protected NodeEntry __getNodeDetails(Node node) throws Exception{
         INode iNode = iNodeStoreGateway.getINode(node.getiNodeAddress());
         LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames = extentStoreGateway.getExtentFrames(iNode.getExtentStoreAddress(), iNode.getExtentCount());
         return new NodeEntry(node, iNode, extentFrames);

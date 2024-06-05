@@ -153,23 +153,23 @@ public class BinaryUtilities {
         return -1;
     }
     /**
-     * This method takes a byte, a start index, an end index (inclusive) and a value: 0 or 1. It sets the bits at the
+     * This method takes a byte, a start index, an end index (exclusive) and a value: 0 or 1. It sets the bits at the
      * given indices to the given binary value.
      * @param b The target byte
      * @param startIndex The index of the first bit
-     * @param endIndex The index of the last bit
+     * @param endIndex The index after the last bit
      * @param bitValue A bit value: 0 or 1
      * @return The modified byte
      */
     public static byte setByteIndices(byte b, int startIndex, int endIndex, int bitValue){
-        if (startIndex < 0 || endIndex < startIndex || endIndex > 7)
+        if (startIndex < 0 || endIndex < startIndex || endIndex > 8)
             throw new IllegalArgumentException("Invalid Indices:Start and End indices must be between 0 and 7 (inclusive)." +
                     " Start should always be less than or equal to the end index");
         if (bitValue != 0 && bitValue != 1)
             throw new IllegalArgumentException("InvalidValue: Value must be either 0 or 1.");
         byte mask = (byte)0b10000000;
         // Fill the mask with as many "1" bits as the length of the run (endIndex - startIndex)
-        for (int i = 0; i < (endIndex - startIndex); i++){
+        for (int i = 0; i < (endIndex - startIndex - 1); i++){
             mask >>= 1;
         }
         // Move the first 1 bit to the start position using logical right shift.

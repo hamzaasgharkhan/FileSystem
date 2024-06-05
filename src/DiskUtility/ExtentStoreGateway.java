@@ -134,16 +134,18 @@ class ExtentStoreGateway {
             for (int i = 0; i < extentFramesSize; i++){
                 if (i == 0) {
                     firstIndex = index = bitMapUtility.getFreeIndexExtentStore();
+                    bitMapUtility.setIndexExtentStore(index, true);
                     nextIndex = bitMapUtility.getFreeIndexExtentStore();
                 } else if (i + 1 < extentFramesSize){
                     index = nextIndex;
+                    bitMapUtility.setIndexExtentStore(index, true);
                     nextIndex = bitMapUtility.getFreeIndexExtentStore();
                 } else {
                     index = nextIndex;
+                    bitMapUtility.setIndexExtentStore(index, true);
                 }
                 __addExtentEntry(byteArray, extentFrames.get(i), nextIndex);
                 __writeExtentFrameToFile(file, byteArray, index);
-                bitMapUtility.setIndexExtentStore(index, true);
             }
         }
         try {

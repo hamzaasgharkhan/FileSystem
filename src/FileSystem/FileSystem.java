@@ -183,11 +183,13 @@ public class FileSystem {
     /**
      * This method provides a FileOutputStream to access the required file.
      * @param path The path of the required file
-     * @return A FileOutputStream for the requested File.
+     * @return An InputStream for the requested File.
      */
-    public FileInputStream openFile(String path){
-        // IMPLEMENT
-        return null;
+    public CustomInputStream openFile(String path) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        if (node.isDirectory())
+            throw new Exception("Node is a directory");
+        return new CustomInputStream(gateway, node);
     }
 
     /**

@@ -1,14 +1,9 @@
 package Run;
-import DiskUtility.Crypto;
+import DiskUtility.CustomInputStream;
 import FileSystem.FileSystem;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
-import javax.crypto.SecretKey;
+import java.io.FileOutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.SecureRandom;
-import java.security.Security;
-import java.util.Arrays;
 
 public class Main {
     public static void main(String[] args){
@@ -16,6 +11,34 @@ public class Main {
         Path createPath = Paths.get("");
         Path mountPath = Paths.get("Aqua");
         try {
+            Path path1 = Paths.get("file1.jpg");
+            Path path2 = Paths.get("file2.jpg");
+            Path path3 = Paths.get("file3.jpg");
+            Path path4 = Paths.get("file4.jpg");
+            Path path5 = Paths.get("1.png");
+            Path path6 = Paths.get("1.mp4");
+            Path largePath = Paths.get("large.mp4");
+            if (!path1.toFile().exists()) {
+                throw new Exception("NO SUCH FILE.");
+            }
+            if (!path2.toFile().exists()) {
+                throw new Exception("NO SUCH FILE.");
+            }
+            if (!path3.toFile().exists()) {
+                throw new Exception("NO SUCH FILE.");
+            }
+            if (!path4.toFile().exists()) {
+                throw new Exception("NO SUCH FILE.");
+            }
+            if (!path5.toFile().exists()) {
+                throw new Exception("NO SUCH FILE.");
+            }
+            if (!path6.toFile().exists()) {
+                throw new Exception("NO SUCH FILE.");
+            }
+            if (!largePath.toFile().exists()) {
+                throw new Exception("NO SUCH FILE.");
+            }
 //            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
             fs = FileSystem.mount(mountPath, "kratos123");
 //            fs.createDirectory("/", "sheep");
@@ -25,11 +48,22 @@ public class Main {
 //            fs.createDirectory("/Obama1","Obama2");
 //            fs.createDirectory("/Obama1/Obama2","Obama3");
 //            fs.createDirectory("/Obama1/Obama2/Obama3","Obama4");
-            Path path = Paths.get("file3.jpg");
-            if (!path.toFile().exists())
-                throw new Exception("NO SUCH FILE.");
-//            fs.addFile(path);
+//            fs.addFile(path1);
+//            fs.addFile(path2);
+//            fs.removeNode("/home/rogue/Desktop/Files/FYP/Project/FYP/file1.jpg");
+//            fs.addFile(path3);
 //            fs.removeNode("/home/rogue/Desktop/Files/FYP/Project/FYP/file2.jpg");
+//            fs.addFile(path4);
+//            fs.addFile(path5);
+//            fs.addFile(path6);
+//            fs.addFile(largePath);
+//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file1.jpg", "output1.jpg");
+//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file2.jpg", "output2.jpg");
+            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file3.jpg", "output3.jpg");
+            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file4.jpg", "output4.jpg");
+            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
+            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/1.mp4", "output6.mp4");
+//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/large.mp4", "outputLarge.mp4");
 //            fs.removeDirectory("/Obama1", true);
 //            fs.ls("/");
 //            fs.ls("/");
@@ -37,5 +71,16 @@ public class Main {
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
+    }
+    public static void writeFileToDisk(FileSystem fs, String path, String outputName) throws Exception{
+        CustomInputStream fin = fs.openFile(path);
+        FileOutputStream fout = new FileOutputStream(outputName);
+        byte[] buffer = new byte[4096];
+        int len;
+        while ((len = fin.read(buffer)) != -1) {
+            fout.write(buffer, 0, len);
+        }
+        fin.close();
+        fout.close();
     }
 }

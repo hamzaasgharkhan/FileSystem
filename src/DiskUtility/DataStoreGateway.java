@@ -6,8 +6,8 @@ import javax.crypto.SecretKey;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.LinkedList;
-import java.util.Random;
 
 /**
  * This class provides an interface between the DataStore files and the rest of the filesystem.
@@ -72,17 +72,18 @@ class DataStoreGateway {
                             if (end == -1){
                                 // If it is the last byte, set the last index as the end and return runs.
                                 if (i == DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX - 1){
-                                    end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
+                                    end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 8;
                                     runs.add(start);
-                                    runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
+                                    runs.add(end - start); // To convert indices into length, add 1 to account for the 0 index.
                                     return runs.stream().mapToInt(x->x).toArray();
                                 }
                                 break;
                             }
                             // If end has been found, add the run to the linked list.
+                            j = end;
                             end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + end;
                             runs.add(start);
-                            runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
+                            runs.add(end - start); // To convert indices into length, add 1 to account for the 0 index.
                             start = -1;
                         }
                     }
@@ -91,9 +92,9 @@ class DataStoreGateway {
                     if (arr[i] == 0) {
                         // If it is the last byte, set the last index as the end of run and return.
                         if (i == DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX - 1){
-                            end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
+                            end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 8;
                             runs.add(start);
-                            runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
+                            runs.add(end - start); // To convert indices into length, add 1 to account for the 0 index.
                             return runs.stream().mapToInt(x->x).toArray();
                         }
                         continue;
@@ -113,10 +114,10 @@ class DataStoreGateway {
                                 }
                                 break;
                             }
-                            end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + end;
                             j = end;
+                            end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + end;
                             runs.add(start);
-                            runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
+                            runs.add(end - start); // To convert indices into length, add 1 to account for the 0 index.
                             start = -1;
                             end = -1;
                         } else {
@@ -151,23 +152,23 @@ class DataStoreGateway {
             // Set the bitmaps.
             int startByteIndex = DATA_STORE_BLOCK_FRAME.BITMAP_INDEX + (start / 8);
             int startBitIndex = (start % 8);    // Subtracted from 7 to ensure that the leftmost bit is index 0
-            int endByteIndex = DATA_STORE_BLOCK_FRAME.BITMAP_INDEX + (start + (length / 8));
-            int endBitIndex = (length % 8);     // Subtracted from 7 to ensure that the leftmost bit is index 0
+            int endByteIndex = DATA_STORE_BLOCK_FRAME.BITMAP_INDEX +  ((start + length) / 8);
+            int endBitIndex = (start + length) % 8; // Non inclusive
             // Case 1: Both the start and end indices lie in the same byte
             if (startByteIndex == endByteIndex){
                 arr[startByteIndex] = BinaryUtilities.setByteIndices(arr[startByteIndex], startBitIndex, endBitIndex, bitValue);
                 return;
             }
             // Case 2: The start and end indices lie in different bytes
-            arr[startByteIndex] = BinaryUtilities.setByteIndices(arr[startByteIndex], startBitIndex, 7, bitValue);
+            arr[startByteIndex] = BinaryUtilities.setByteIndices(arr[startByteIndex], startBitIndex, 8, bitValue);
             for (int i = startByteIndex + 1; i < endByteIndex; i++){
                 if (bitValue == 1)
                     arr[i] = -1;
                 else
                     arr[i] = 0;
             }
-            if (endBitIndex != 0 && endByteIndex < DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX)
-                arr[endByteIndex] = BinaryUtilities.setByteIndices(arr[endByteIndex], 0, endBitIndex - 1, bitValue);
+            if (endBitIndex != 0)
+                arr[endByteIndex] = BinaryUtilities.setByteIndices(arr[endByteIndex], 0, endBitIndex, bitValue);
         }
     }
 
@@ -198,7 +199,7 @@ class DataStoreGateway {
         // Number of inputBlocks that have been read.
         int inputBlocksRead = 0;
         // Contains a data block within data-store
-        byte[] dataBlock;
+        byte[] dataBlock = new byte[DATA_STORE_BLOCK_FRAME.SIZE];
         bytesToWrite = fileSize = file.length();
         if (fileSize == 0L)
             throw new Exception("Cannot Call addFile on a directory.");
@@ -218,7 +219,7 @@ class DataStoreGateway {
         inputBlocksRead++;
         while (bytesToWrite > 0){
             int bytesWrittenFromRunningInputBlock = 0;
-            dataBlock = new byte[DATA_STORE_BLOCK_FRAME.SIZE];
+            Arrays.fill(dataBlock, (byte)0);
             index = bitMapUtility.getFreeIndexDataStore(bytesToWrite);
             if (bitMapUtility.isIndexOccupiedDataStore(index)){
                 try {
@@ -246,14 +247,15 @@ class DataStoreGateway {
                 // Calculate the number of bytes that will be written to the current RUN.
                 int bytesWritableToCurrentRun = (length < bytesToWrite) ? length: (int)bytesToWrite;
                 int bytesWrittenToCurrentRun = 0;
+                int dataBlockIndex = DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX + start;
                 while (bytesWrittenToCurrentRun < bytesWritableToCurrentRun){
                     int localBytesWritten = 0;  // Temporary variable to maintain the number of bytes written
                     int inputBlockLength = inputBlock.length;
-                    int dataBlockIndex = DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX + start;
                     // CASE 1: inputBlock does not need to be refreshed.
                     if (pointer + bytesWritableToCurrentRun <= inputBlockLength){
                         System.arraycopy(inputBlock, pointer, dataBlock, dataBlockIndex, bytesWritableToCurrentRun);
                         localBytesWritten += bytesWritableToCurrentRun;
+                        dataBlockIndex += localBytesWritten;
                         bytesWrittenToCurrentRun += localBytesWritten;
                         bytesToWrite -= localBytesWritten;
                         pointer += localBytesWritten;
@@ -268,8 +270,9 @@ class DataStoreGateway {
                         }
                     } else {
                         // CASE 2: inputBlock does need to be refreshed
-                        System.arraycopy(inputBlock, pointer, dataBlock, dataBlockIndex + localBytesWritten, inputBlockLength - pointer);
+                        System.arraycopy(inputBlock, pointer, dataBlock, dataBlockIndex, inputBlockLength - pointer);
                         localBytesWritten += inputBlockLength - pointer;
+                        dataBlockIndex += localBytesWritten;
                         bytesWrittenToCurrentRun += localBytesWritten;
                         bytesToWrite -= localBytesWritten;
                         if (bytesToWrite >= DATA_STORE_BLOCK_FRAME.FULL_SIZE)
@@ -279,16 +282,21 @@ class DataStoreGateway {
                         inputBlocksRead++;
                         pointer = 0;
                         if (bytesWritableToCurrentRun - bytesWrittenToCurrentRun > 0){
-                            System.arraycopy(inputBlock, pointer, dataBlock, dataBlockIndex + localBytesWritten, bytesWritableToCurrentRun - bytesWrittenToCurrentRun);
-                            localBytesWritten += bytesWritableToCurrentRun - bytesWrittenToCurrentRun;
-                            bytesToWrite -= bytesWritableToCurrentRun - bytesWrittenToCurrentRun;
-                            bytesWrittenToCurrentRun += bytesWritableToCurrentRun - bytesWrittenToCurrentRun;;
+                            int bytesRemaining = bytesWritableToCurrentRun - bytesWrittenToCurrentRun;
+                            System.arraycopy(inputBlock, pointer, dataBlock, dataBlockIndex, bytesRemaining);
+                            pointer += bytesRemaining;
+                            localBytesWritten += bytesRemaining;
+                            dataBlockIndex += bytesRemaining;
+                            bytesToWrite -= bytesRemaining;
+                            bytesWrittenToCurrentRun += bytesRemaining;
                         }
                     }
                     bytesOccupied += (short) localBytesWritten;
                 }
                 extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, bytesWrittenToCurrentRun));
                 DataBlock.setRunOccupied(dataBlock, start, bytesWrittenToCurrentRun, true);
+                if (bytesToWrite == 0)
+                    break;
             }
             DataBlock.setBytesOccupied(dataBlock, bytesOccupied);
 //            DataBlock.setHash();
@@ -373,11 +381,50 @@ class DataStoreGateway {
     }
 
     /**
+     * This method takes a buffer, an extentFrame and an extentIndex. It starts reading within the extent from the given
+     * index and tries to fill the buffer. The method returns in two cases: either the buffer is full or all the bytes
+     * in the given extent have been read.
+     * @param buffer The target buffer to be filled
+     * @param extentFrame The target extentFrame to read from
+     * @param extentIndex The starting index within the extent
+     * @return Number of bytes placed in the buffer
+     */
+    protected int populateBufferFromExtent(byte[] buffer, ExtentStoreGateway.ExtentFrame extentFrame, int bufferIndex, long extentIndex) throws Exception{
+        int bytesWritten = 0;
+        byte[] dataBlock = new byte[DATA_STORE_BLOCK_FRAME.SIZE];
+        // Fill the Buffer
+        long runningBlockIndex = extentFrame.dataStoreIndex + ((extentFrame.offset + extentIndex) / DATA_STORE_BLOCK_FRAME.DATA_SIZE);
+        int runningByteIndex = (int) ((extentFrame.offset + extentIndex) % DATA_STORE_BLOCK_FRAME.DATA_SIZE);
+        long lastBlockIndex = extentFrame.dataStoreIndex + ((extentFrame.offset + extentFrame.length) / DATA_STORE_BLOCK_FRAME.DATA_SIZE);
+        long bytesReadable = extentFrame.length - extentIndex;
+        int bytesToWrite= ((buffer.length - bufferIndex) < bytesReadable ? (buffer.length - bufferIndex) : (int) bytesReadable);
+        int currentDataBlockBytesRead;
+        while (bytesWritten < bytesToWrite){
+            try {
+                __updateDataBlockArray(dataBlock, runningBlockIndex);
+            } catch (Exception e){
+                throw new Exception("Unable to populate buffer from extent (DataStore) " + e.getMessage());
+            }
+            // Set the bytesToRead equal to the number of bytes from the runningByteIndex to the end of the block
+            currentDataBlockBytesRead = DATA_STORE_BLOCK_FRAME.DATA_SIZE - runningByteIndex;
+            // If the runningBlock is the last block or the bytes available in the DataBlock are greater than can be
+            // filled in the buffer, change the size.
+            if (runningBlockIndex == lastBlockIndex || currentDataBlockBytesRead > bytesToWrite - bytesWritten) {
+                currentDataBlockBytesRead = bytesToWrite - bytesWritten;
+            }
+            System.arraycopy(dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX + runningByteIndex, buffer, bytesWritten + bufferIndex, currentDataBlockBytesRead);
+            bytesWritten += currentDataBlockBytesRead;
+            runningByteIndex = 0;
+            runningBlockIndex++;
+        }
+        return bytesWritten;
+    }
+    /**
      * Takes a byte array representing a datablock and a dataStore Address. Writes the block to the address.
      * @param dataBlock The bytearray containing the target datablock
      * @param address Target DataStore Address
      */
-    private void __updateDataBlockFile(byte[] dataBlock, long address) throws Exception{
+    protected void __updateDataBlockFile(byte[] dataBlock, long address) throws Exception{
         RandomAccessFile fin;
         try {
             fin = new RandomAccessFile(dataStoreFile, "rw");
@@ -409,7 +456,7 @@ class DataStoreGateway {
      * @param dataBlock The target byte array of size `DATA_STORE_BLOCK_FRAME.DATA_STORE_FRAME_SIZE`
      * @param address Target DataStore Address
      */
-    private void __updateDataBlockArray(byte[] dataBlock, long address) throws Exception{
+    protected void __updateDataBlockArray(byte[] dataBlock, long address) throws Exception{
         try{
             System.arraycopy(__getDataBlock(address), 0, dataBlock, 0, DATA_STORE_BLOCK_FRAME.SIZE);
         } catch (Exception e){
@@ -424,7 +471,7 @@ class DataStoreGateway {
      * @return byteArray of decrypted datablock.
      * @throws Exception In case of Errors while handling the dataStore File or while decrypting the block.
      */
-    private byte[]  __getDataBlock(long address) throws Exception{
+    protected byte[]  __getDataBlock(long address) throws Exception{
         byte[] byteArray = new byte[DATA_STORE_BLOCK_FRAME.FULL_SIZE];
         RandomAccessFile fin;
         try {
@@ -455,116 +502,3 @@ class DataStoreGateway {
         return byteArray;
     }
 }
-
-
-/**
- *
-
-
-
-
-
-
-
-
- // GET RUNS. WRITE TO THOSE RUNS. KEEP WRITING AND GETTING NEW INDEXES TILL ENTIRE WRITE IS DONE.
- // CREATE APPROPRIATE EXTENT ENTRIES
- // CREATE AN APPROPRIATE INODE
- // RETURN THE INODE
- //        while (bytesToWrite > 0){
- //            int bytesWrittenInRunningBlock = 0;
- //            dataBlock = new byte[DATA_STORE_BLOCK_FRAME.SIZE];
- //            index = bitMapUtility.getFreeIndexDataStore(bytesToWrite);
- //            // If the dataBlock is allocated and exists on disk then read it from disk otherwise work with the empty
- //            // block.
- //            if (bitMapUtility.isIndexOccupiedDataStore(index)){
- //                try {
- //                    __updateDataBlockArray(dataBlock, index);
- //                } catch (EOFException e){
- //                    throw new Exception("Error in dataBlock file. Either the provided index: " + index + " does not exist" +
- //                            "in the data-store file or the contents of the data-store file have been corrupted." + e.getMessage());
- //                } catch (IOException e){
- //                    throw new Exception("Unable to access the contents of data-store file."  + e.getMessage());
- //                }
- //            }
- //            bytesOccupied = DataBlock.getBytesOccupied(dataBlock);
- //            int[] runs = DataBlock.getRuns(dataBlock);
- //            if (runs.length == 0)
- //                throw new Exception("Unexpected Error. Code Has a bug. This Exception should never be printed." +
- //                        "The index provided by the bitmapUtility does not have a free byte." +
- //                        "Possible reasons: Bug in Code, Inconsistency between writes and reads");
- //            if (runs.length % 2 != 0)
- //                throw new Exception("Unexpected Error. Runs should always have even number of elements. Pairs of" +
- //                        "start and end indices. Currently runs has an odd number of elements.");
- //            int start, length;
- //            for (int i = 0; i < runs.length; i+=2) {
- //                start = runs[i];
- //                length = runs[i + 1];
- //                if (((pointer + bytesToWrite) <= DATA_STORE_BLOCK_FRAME.FULL_SIZE) ||
- //                        ((pointer + length) <= DATA_STORE_BLOCK_FRAME.FULL_SIZE)) {
- //                    // Case 1: All the data is within the inputFile buffer, no more data needs to be read from the file.
- //                    // If the run can accommodate all the data that is left in the buffer, use the parts of the run
- //                    // that are necessary and leave the rest of the run empty.
- //                    // Case 2: All the data of the file is not within the buffer, hence the buffer will need to be
- //                    // refreshed at some point. However, all the data that the current run can accommodate is in the
- //                    // buffer, hence we do not need to refresh the buffer for this particular run.
- //                    // In both cases, the buffer does not need to be updated. The only thing that needs to
- //                    // be checked is whether we need to write `length` bytes to the dataBlock or `bytesToWrite` bytes
- //                    // to the dataBlock.
- //                    // Set the smaller value of the two to localBytesToWrite
- //                    int localBytesToWrite = (length < bytesToWrite) ? length : (int)bytesToWrite;
- //                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX +  start, localBytesToWrite);
- //                    // The bytes that are written will be set to 0 within the inputBlock array. Fix this issue.
- //                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite, true);
- //                    bytesOccupied += (short) localBytesToWrite;
- //                    bytesWrittenInRunningBlock += localBytesToWrite;
- //                    pointer += localBytesToWrite;
- //                    // If the pointer is set to the end of the block, reset the pointer
- //                    if (pointer == DATA_STORE_BLOCK_FRAME.FULL_SIZE)
- //                        pointer = 0;
- //                    extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
- //                } else if (((pointer + bytesToWrite) > DATA_STORE_BLOCK_FRAME.DATA_SIZE) && (pointer + length) > DATA_STORE_BLOCK_FRAME.DATA_SIZE) { // There was a greater than or equal to in the second condition. why?
- //                    // In this case, the buffer needs to be refreshed.
- //                    // The run can accommodate more than what the current buffer has. Buffer needs to be updated.
- //                    // First copy the data that is in the dataBlock
- //                    // Set to the smaller value of the two: length of the run and bytesToWrite.
- //                    int localBytesToWrite = (length < bytesToWrite) ? length : (int) bytesToWrite;
- //                    int localBytesWritten = DATA_STORE_BLOCK_FRAME.DATA_SIZE - pointer; // Number of bytes that can be written to the given block
- //                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX +  start, localBytesWritten);
- //                    // Still more than 4096 bytes left in the file to read
- //                    try {
- //                        if (bytesToWrite - localBytesWritten > 4096) {
- //                            inputFile.readFully(inputBlock, 0, 4096);
- //                        } else {
- //                            inputFile.readFully(inputBlock, 0, (int) bytesToWrite - localBytesWritten);
- //                        }
- //                    } catch (EOFException e){
- //                        throw new Exception("Request to read more bytes than the file has left." + e.getMessage());
- //                    } catch (IOException e){
- //                        throw new Exception("Unable to access the contents of the user input file." + e.getMessage());
- //                    }
- //                    pointer = 0;
- //                    System.arraycopy(inputBlock, pointer, dataBlock, DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX + start + localBytesWritten, localBytesToWrite - localBytesWritten);
- //                    pointer += localBytesToWrite - localBytesWritten;
- //                    DataBlock.setRunOccupied(dataBlock, start, localBytesToWrite, true);
- //                    bytesOccupied += (short) localBytesToWrite;
- //                    bytesWrittenInRunningBlock += localBytesToWrite;
- //                    extentFramesLinkedList.add(new ExtentStoreGateway.ExtentFrame(index, start, localBytesToWrite));
- //                } else {
- //                    throw new Exception("BUG. THIS EXCEPTION SHOULD NEVER BE THROWN.");
- //                }
- //                bytesToWrite -= bytesWrittenInRunningBlock;
- //            }
- //            DataBlock.setBytesOccupied(dataBlock, bytesOccupied);
- //            // CREATE FUNCTIONALITY TO ADD THE MD5 HASH for the data block.
- //            // ALSO CHECK FOR ANY FLAGS IF POSSIBLE
- //            // DataBlock.setHash()
- //            bitMapUtility.setIndexDataStore(index, bytesOccupied); // FIX THIS METHOD TO TAKE THE NUMBER OF BYTE THAT ARE OCCUPIED BY THE BLOCK NOW. THE BITMAP SHOULD DECIDE TH EBITMAP
- //            try {
- //                __updateDataBlockFile(dataBlock, index);
- //
- //            } catch (IOException e){
- //                throw new Exception("Error with accessing and writing to the data-store file." + e.getMessage());
- //            }
- //        }
- */

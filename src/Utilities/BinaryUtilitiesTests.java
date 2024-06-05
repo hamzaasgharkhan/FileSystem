@@ -97,7 +97,7 @@ public class BinaryUtilitiesTests {
     public void setByteIndices(){
         byte b = (byte) 0b11011101;
         byte actual = BinaryUtilities.setByteIndices(b, 1, 4, 0);
-        byte expected = (byte)0b10000101;
+        byte expected = (byte)0b10001101;
         Assertions.assertEquals(expected, actual);
     }
 }
