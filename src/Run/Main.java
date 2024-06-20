@@ -1,7 +1,9 @@
 package Run;
+import net.coobird.thumbnailator.Thumbnails;
 import DiskUtility.CustomInputStream;
 import FileSystem.FileSystem;
-import java.io.FileOutputStream;
+
+import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -40,7 +42,7 @@ public class Main {
                 throw new Exception("NO SUCH FILE.");
             }
 //            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
-            fs = FileSystem.mount(mountPath, "kratos123");
+//            fs = FileSystem.mount(mountPath, "kratos123");
 //            fs.createDirectory("/", "sheep");
 //            fs.createDirectory("/","Obama1");
 //            fs.createDirectory("/","Iqbal");
@@ -59,15 +61,16 @@ public class Main {
 //            fs.addFile(largePath);
 //            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file1.jpg", "output1.jpg");
 //            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file2.jpg", "output2.jpg");
-            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file3.jpg", "output3.jpg");
-            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file4.jpg", "output4.jpg");
-            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
-            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/1.mp4", "output6.mp4");
+//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file3.jpg", "output3.jpg");
+//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file4.jpg", "output4.jpg");
+//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
+//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/1.mp4", "output6.mp4");
 //            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/large.mp4", "outputLarge.mp4");
 //            fs.removeDirectory("/Obama1", true);
 //            fs.ls("/");
 //            fs.ls("/");
-            fs.printTree();
+//            fs.printTree();
+            thumbnailGeneration();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }
@@ -82,5 +85,44 @@ public class Main {
         }
         fin.close();
         fout.close();
+    }
+    public static void thumbnailGeneration(){
+        try {
+            // Example with FileInputStream
+            FileInputStream fis = new FileInputStream("1.jpg");
+
+            // Create a ByteArrayOutputStream to hold the thumbnail bytes
+//            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+            // Specify the size of the thumbnail
+            int thumbnailSize = 640;
+
+            // Create a thumbnail and write it to the ByteArrayOutputStream
+            Thumbnails.of(fis)
+                    .outputQuality(0.5)
+                    .size(thumbnailSize, thumbnailSize)
+                    .outputFormat("jpg") // Optional
+//                    .toOutputStream(baos);
+                    .toFile("testThumbnail");
+
+            // Close the FileInputStream
+            fis.close();
+
+            // Convert the ByteArrayOutputStream to an InputStream
+//            InputStream thumbnailInputStream = new ByteArrayInputStream(baos.toByteArray());
+
+            // Now you can use thumbnailInputStream as needed, for example:
+            // 1. Upload to a storage service
+            // 2. Process further in-memory
+            // 3. Return as a response in a web application, etc.
+
+            // Close the ByteArrayOutputStream
+//            baos.close();
+
+            System.out.println("Thumbnail created successfully.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

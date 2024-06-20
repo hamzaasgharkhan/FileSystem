@@ -13,9 +13,8 @@ import java.util.LinkedList;
  */
 public class FileSystem {
     private NodeTree dir;
-    private SuperBlock superBlock;
     private Gateway gateway;
-    byte flags;
+    private byte flags;
     /**
      * The constructor for the FileSystem in private. FileSystem can only be created by using the appropriate methods.
      */
@@ -31,10 +30,10 @@ public class FileSystem {
     public static FileSystem createFileSystem(Path path, String fileSystemName, String password) throws Exception {
         FileSystem fs = new FileSystem();
         Crypto.init();
-        fs.superBlock = new SuperBlock(fileSystemName);
+        SuperBlock superBlock = new SuperBlock(fileSystemName);
         path = path.resolve(fileSystemName);
         try{
-            fs.gateway = new Gateway(path, fs.superBlock, password, true);
+            fs.gateway = new Gateway(path, superBlock, password, true);
             fs.dir = new NodeTree();
             fs.gateway.addNode(fs.dir.getDirtyNodes().pop());
         } catch (Exception e){
@@ -67,7 +66,6 @@ public class FileSystem {
             throw new IllegalArgumentException("Unable to create directory." + e.getMessage());
         }
     }
-
     public void ls(String path) throws Exception{
         try {
             LinkedList<Node> nodes = dir.ls(path, gateway.getDirectoryStoreGateway());
@@ -80,16 +78,6 @@ public class FileSystem {
             throw new Exception(e.getMessage());
         }
     }
-    /**
-     * This method creates a new empty file at the specified path if the path exists.
-     * @param path The path of the new directory (inclusive of the file name)
-     * @return true if and only if the operation is successful.
-     */
-    public boolean createFile(String path){
-        // IMPLEMENT
-        return false;
-    }
-
     /**
      * This method imports a file from another filesystem to the specified path if the path exists.
      * This method does not deal with directories. A wrapper will need to be provided to distinguish between adding
@@ -259,27 +247,6 @@ public class FileSystem {
         // IMPLEMENT
         return false;
     }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // THE CLASSES BELOW NEED REFINEMENT BEFORE IMPLEMENTATION      ////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /**
-     * This method is used to write to a file
-     * @return The number of bytes remaining to write. Returns 0 if and only if all bytes have been successfully written.
-     */
-    public int write(){
-        // IMPLEMENT
-        return -1;
-    }
-
-    /**
-     * This method is used to read from a file
-     * @return The number of bytes remaining to write. Returns 0 if and only if all bytes have been successfully written.
-     */
-    public int read(){
-        // IMPLEMENT
-        return -1;
-    }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Public Auxiliary Methods
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -321,14 +288,6 @@ public class FileSystem {
 
     public void setDir(NodeTree dir) {
         this.dir = dir;
-    }
-
-    public SuperBlock getSuperBlock() {
-        return superBlock;
-    }
-
-    public void setSuperBlock(SuperBlock superBlock) {
-        this.superBlock = superBlock;
     }
 
     public Gateway getGateway() {
