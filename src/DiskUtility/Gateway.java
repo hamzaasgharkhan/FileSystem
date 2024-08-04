@@ -4,17 +4,15 @@ import Constants.DIRECTORY_STORE_FRAME;
 import Constants.SUPER_BLOCK_BASE_FRAME;
 import Constants.VALUES;
 import FileSystem.FileSystem;
-import FileSystem.SuperBlock;
-import FileSystem.Node;
 import FileSystem.INode;
+import FileSystem.Node;
+import FileSystem.SuperBlock;
+import FileSystem.InputFile;
 
 import javax.crypto.SecretKey;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.SecureRandom;
 import java.util.LinkedList;
 
@@ -165,11 +163,11 @@ public class Gateway {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //  Adding actual data files.
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public INode addFile(Path path) throws Exception{
-        File file = path.toFile();
+    public INode addFile(InputFile file) throws Exception{
         long[] extentStoreDetails = extentStoreGateway.addExtentEntry(dataStoreGateway.addNode(file));
-        long thumbnailStoreAddress = thumbnailStoreGateway.addNode(path);
-        return iNodeStoreGateway.addNode(path, extentStoreDetails, thumbnailStoreAddress);
+        long thumbnailStoreAddress = thumbnailStoreGateway.addNode(file);
+        file.close();
+        return iNodeStoreGateway.addNode(file, extentStoreDetails, thumbnailStoreAddress);
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //  Removing actual data files

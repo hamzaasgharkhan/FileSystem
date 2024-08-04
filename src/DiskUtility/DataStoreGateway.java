@@ -1,5 +1,6 @@
 package DiskUtility;
 import Constants.DATA_STORE_BLOCK_FRAME;
+import FileSystem.InputFile;
 import Utilities.BinaryUtilities;
 
 import javax.crypto.SecretKey;
@@ -188,14 +189,14 @@ class DataStoreGateway {
         this.key = key;
     }
 
-    LinkedList<ExtentStoreGateway.ExtentFrame> addNode(File file) throws Exception{
+    LinkedList<ExtentStoreGateway.ExtentFrame> addNode(InputFile file) throws Exception{
         // A LinkedList of ExtentFrame that will be used in the end to create extents that span across multiple blocks.
         LinkedList<ExtentStoreGateway.ExtentFrame> extentFramesLinkedList = new LinkedList<ExtentStoreGateway.ExtentFrame>();
         long fileSize, bytesToWrite, index;
         // The bytesOccupied field of the block
         short bytesOccupied;
         // user input file.
-        RandomAccessFile inputFile;
+        InputStream fileInputStream = file.fileInputStream;
         // pointer within the inputBlock
         int pointer = 0;
         // Contains the data of the user input file
@@ -204,21 +205,19 @@ class DataStoreGateway {
         int inputBlocksRead = 0;
         // Contains a data block within data-store
         byte[] dataBlock = new byte[DATA_STORE_BLOCK_FRAME.SIZE];
-        bytesToWrite = fileSize = file.length();
+        bytesToWrite = fileSize = file.size;
         if (fileSize == 0L)
-            throw new Exception("Cannot Call addFile on a directory.");
-        try {
-            inputFile = new RandomAccessFile(file, "r");
-        } catch (FileNotFoundException e){
-            throw new Exception("inputFile Not Found." + e.getMessage());
+            throw new Exception("File is Empty.");
+        if (fileInputStream == null){
+            throw new Exception("InputStream is null");
         }
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // FIX THE TRY CATCH. NOT EVERYTHING SHOULD BE IN THE TRY CATCH.
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         if (fileSize >= DATA_STORE_BLOCK_FRAME.FULL_SIZE){
-            __fillInputBlock(inputFile, inputBlock, inputBlocksRead, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
+            __fillInputBlock(fileInputStream, inputBlock, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
         } else {
-            __fillInputBlock(inputFile, inputBlock, inputBlocksRead, (int)fileSize);
+            __fillInputBlock(fileInputStream, inputBlock, (int)fileSize);
         }
         inputBlocksRead++;
         while (bytesToWrite > 0){
@@ -266,9 +265,9 @@ class DataStoreGateway {
                         // ENSURE THAT THE pointer is set to 0 when it reaches inputBlockLength
                         if (pointer == DATA_STORE_BLOCK_FRAME.FULL_SIZE){
                             if (bytesToWrite >= DATA_STORE_BLOCK_FRAME.FULL_SIZE)
-                                __fillInputBlock(inputFile, inputBlock, inputBlocksRead, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
+                                __fillInputBlock(fileInputStream, inputBlock, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
                             else
-                                __fillInputBlock(inputFile, inputBlock, inputBlocksRead, (int)bytesToWrite);
+                                __fillInputBlock(fileInputStream, inputBlock, (int)bytesToWrite);
                             inputBlocksRead++;
                             pointer = 0;
                         }
@@ -280,9 +279,9 @@ class DataStoreGateway {
                         bytesWrittenToCurrentRun += localBytesWritten;
                         bytesToWrite -= localBytesWritten;
                         if (bytesToWrite >= DATA_STORE_BLOCK_FRAME.FULL_SIZE)
-                            __fillInputBlock(inputFile, inputBlock, inputBlocksRead, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
+                            __fillInputBlock(fileInputStream, inputBlock, DATA_STORE_BLOCK_FRAME.FULL_SIZE);
                         else
-                            __fillInputBlock(inputFile, inputBlock, inputBlocksRead, (int)bytesToWrite);
+                            __fillInputBlock(fileInputStream, inputBlock, (int)bytesToWrite);
                         inputBlocksRead++;
                         pointer = 0;
                         if (bytesWritableToCurrentRun - bytesWrittenToCurrentRun > 0){
@@ -311,18 +310,15 @@ class DataStoreGateway {
                 throw new Exception("Error with accessing and writing to the data-store file." + e.getMessage());
             }
         }
-        try{
-            inputFile.close();
-        } catch (IOException e){
-            throw new Exception("Unable to close user input file." + e.getMessage());
-        }
         return ExtentStoreGateway.ExtentFrame.getCompactExtentList(extentFramesLinkedList);
     }
 
-    private void __fillInputBlock(RandomAccessFile inputFile, byte[] inputBlock, int inputBlocksRead, int bytesToRead) throws Exception{
+    private void __fillInputBlock(InputStream fileInputStream, byte[] inputBlock, int bytesToRead) throws Exception{
         try {
-            inputFile.seek((long) DATA_STORE_BLOCK_FRAME.FULL_SIZE * inputBlocksRead);
-            inputFile.readFully(inputBlock, 0, bytesToRead);
+            int bytesRead = fileInputStream.readNBytes(inputBlock, 0, bytesToRead);
+            if (bytesRead != bytesToRead){
+                throw new Exception("Number of bytes read is not the same as number of bytes requested");
+            }
         } catch (FileNotFoundException e){
             throw new Exception("File being added by user not found or data-store file not found." + e.getMessage());
         } catch (EOFException e){

@@ -3,6 +3,7 @@ package DiskUtility;
 import Constants.FLAGS;
 import Constants.INODE_STORE_FRAME;
 import FileSystem.INode;
+import FileSystem.InputFile;
 import Utilities.BinaryUtilities;
 
 import javax.crypto.SecretKey;
@@ -33,27 +34,16 @@ public class INodeStoreGateway {
         this.key = key;
     }
 
-    public INode addNode(Path path, long[] extentDetails, long thumbnailStoreAddress) throws Exception{
-        long creationTime;
-        long lastModifiedTime;
+    public INode addNode(InputFile file, long[] extentDetails, long thumbnailStoreAddress) throws Exception{
         long iNodeAddress;
-        long iNodeSize;
         INode iNode;
         RandomAccessFile fin;
-        try {
-            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class);
-            creationTime = attributes.creationTime().toMillis();
-            lastModifiedTime = attributes.lastModifiedTime().toMillis();
-            iNodeSize = attributes.size();
-        } catch (IOException e){
-            throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
-        }
         iNodeAddress = bitMapUtility.getFreeIndexINodeStore();
         iNode = new INode();
         iNode.setiNodeAddress(iNodeAddress);
-        iNode.setiNodeSize(iNodeSize);
-        iNode.setCreationTime(creationTime);
-        iNode.setLastModifiedTime(lastModifiedTime);
+        iNode.setiNodeSize(file.size);
+        iNode.setCreationTime(file.creationTime);
+        iNode.setLastModifiedTime(file.lastModifiedTime);
         iNode.setExtentStoreAddress(extentDetails[0]);
         iNode.setExtentCount(extentDetails[1]);
         iNode.setThumbnailStoreAddress(thumbnailStoreAddress);

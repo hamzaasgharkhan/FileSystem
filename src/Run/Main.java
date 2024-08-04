@@ -2,15 +2,19 @@ package Run;
 import net.coobird.thumbnailator.Thumbnails;
 import DiskUtility.CustomInputStream;
 import FileSystem.FileSystem;
+import FileSystem.InputFile;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 
 public class Main {
     public static void main(String[] args){
         FileSystem fs;
-        File createPath = Paths.get("").toAbsolutePath().toFile();
+        Path parentPath = Paths.get("");
+        File createPath = parentPath.toAbsolutePath().toFile();
         File mountPath = new File("Aqua");
         try {
             Path path1 = Paths.get("file1.jpg");
@@ -41,6 +45,24 @@ public class Main {
             if (!largePath.toFile().exists()) {
                 throw new Exception("NO SUCH FILE.");
             }
+            long file1CreationTime, file1LastModifiedTime, file1Size;
+            try {
+                BasicFileAttributes attributes = Files.readAttributes(path1, BasicFileAttributes.class);
+                file1CreationTime = attributes.creationTime().toMillis();
+                file1LastModifiedTime = attributes.lastModifiedTime().toMillis();
+                file1Size = attributes.size();
+            } catch (IOException e){
+                throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
+            }
+            InputFile file1 = new InputFile(
+                    path1.getFileName().toString(),
+                    parentPath.toAbsolutePath().toString(),
+                    file1Size,
+                    file1CreationTime,
+                    file1LastModifiedTime,
+                    new FileInputStream(path1.toFile()),
+                    null
+            );
 //            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
             fs = FileSystem.mount(mountPath, "kratos123");
 //            fs.createDirectory("/", "sheep");
@@ -50,7 +72,7 @@ public class Main {
 //            fs.createDirectory("/Obama1","Obama2");
 //            fs.createDirectory("/Obama1/Obama2","Obama3");
 //            fs.createDirectory("/Obama1/Obama2/Obama3","Obama4");
-//            fs.addFile(path1);
+//            fs.addFile(file1);
 //            fs.addFile(path2);
 //            fs.removeNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/file1.jpg");
 //            fs.addFile(path3);
@@ -59,7 +81,7 @@ public class Main {
 //            fs.addFile(path5);
 //            fs.addFile(path6);
 //            fs.addFile(largePath);
-//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file1.jpg", "output1.jpg");
+            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file1.jpg", "output1.jpg");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file2.jpg", "output2.jpg");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file3.jpg", "output3.jpg");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file4.jpg", "output4.jpg");

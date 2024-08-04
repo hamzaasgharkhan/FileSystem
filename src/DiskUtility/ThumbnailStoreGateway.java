@@ -2,6 +2,7 @@ package DiskUtility;
 
 import Constants.FLAGS;
 import Constants.VALUES;
+import FileSystem.InputFile;
 import Utilities.BinaryUtilities;
 
 import javax.crypto.SecretKey;
@@ -20,7 +21,7 @@ public class ThumbnailStoreGateway {
         return new byte[11];
     }
 
-    public long addNode(Path path) {
+    public long addNode(InputFile file) {
         // IMPLEMENT LATER
         // CREATE THUMBNAIL
         // ADD THUMBNAIL TO THUMBNAIL_STORE

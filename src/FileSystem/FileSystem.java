@@ -86,10 +86,10 @@ public class FileSystem {
      * This method imports a file from another filesystem to the specified path if the path exists.
      * This method does not deal with directories. A wrapper will need to be provided to distinguish between adding
      * directories and files.
-     * @param path  the path to the file.
+     * @param file InputFile object containing the file
      * @return true if and only if the operation is successful.
      */
-    public void addFile(Path path) throws Exception{
+    public void addFile(InputFile file) throws Exception{
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // MAKE A WAY TO FIND OUT WHERE THE FILE IS BEING ADDED. i.e. what is the parent node of the file.
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,20 +102,12 @@ public class FileSystem {
             directory structure and then add the node to that path.
             -> Create a node and add the node to the directory tree
          */
-        String parentPath;
-        parentPath = path.toAbsolutePath().getParent().toString();
-        // This block changes the separator from windows format to linux format and also treats the drive as a
-        // folder within the root directory.
-        if (path.getFileSystem().getSeparator().equals("\\")){
-            parentPath = parentPath.replace("\\", "/");
-            parentPath = parentPath.replaceFirst(":", "");
-            parentPath = "/" + parentPath;
-        }
-        if (!path.toFile().exists())
+        String parentPath = file.parentPath;
+        if (file.fileInputStream == null)
             throw new Exception("File Does Not Exist");
-        INode iNode = gateway.addFile(path);
+        INode iNode = gateway.addFile(file);
         Node parentNode = dir.getOrCreatePath(parentPath, gateway.getDirectoryStoreGateway());
-        dir.addNode(parentNode, path.getFileName().toString(), iNode.getiNodeAddress());
+        dir.addNode(parentNode, file.name, iNode.getiNodeAddress());
         __writeDirtyNodes();
     }
 
