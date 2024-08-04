@@ -89,13 +89,15 @@ public abstract class SuperBlockGateway{
     }
     /**
      * This method extracts the SuperBlock object from the file on disk.
-     * @param path The path to the FileSystem.
+     * @param baseFile The path to the FileSystem.
      * @return SuperBlock Object stored in the SuperBlock file
      */
-    protected static SuperBlock getSuperBlock(Path path, SecretKey key) throws Exception{
-        File file = path.resolve("super-block").toFile();
-        if (!file.exists()){
-            throw new Exception("SuperBlock File Does Not Exist.");
+    protected static SuperBlock getSuperBlock(File baseFile, SecretKey key) throws Exception{
+        File file;
+        try {
+            file = Gateway.getFileInBaseDirectory(baseFile, "super-block");
+        } catch (Exception e){
+            throw new Exception("Unable to Get SuperBlock: " + e.getMessage());
         }
         byte[] byteArray;
         FileInputStream fin;

@@ -10,8 +10,8 @@ import java.nio.file.Paths;
 public class Main {
     public static void main(String[] args){
         FileSystem fs;
-        Path createPath = Paths.get("");
-        Path mountPath = Paths.get("Aqua");
+        File createPath = Paths.get("").toAbsolutePath().toFile();
+        File mountPath = new File("Aqua");
         try {
             Path path1 = Paths.get("file1.jpg");
             Path path2 = Paths.get("file2.jpg");
@@ -42,7 +42,7 @@ public class Main {
                 throw new Exception("NO SUCH FILE.");
             }
 //            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
-//            fs = FileSystem.mount(mountPath, "kratos123");
+            fs = FileSystem.mount(mountPath, "kratos123");
 //            fs.createDirectory("/", "sheep");
 //            fs.createDirectory("/","Obama1");
 //            fs.createDirectory("/","Iqbal");
@@ -52,25 +52,25 @@ public class Main {
 //            fs.createDirectory("/Obama1/Obama2/Obama3","Obama4");
 //            fs.addFile(path1);
 //            fs.addFile(path2);
-//            fs.removeNode("/home/rogue/Desktop/Files/FYP/Project/FYP/file1.jpg");
+//            fs.removeNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/file1.jpg");
 //            fs.addFile(path3);
-//            fs.removeNode("/home/rogue/Desktop/Files/FYP/Project/FYP/file2.jpg");
+//            fs.removeNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/file2.jpg");
 //            fs.addFile(path4);
 //            fs.addFile(path5);
 //            fs.addFile(path6);
 //            fs.addFile(largePath);
-//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file1.jpg", "output1.jpg");
-//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file2.jpg", "output2.jpg");
-//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file3.jpg", "output3.jpg");
-//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/file4.jpg", "output4.jpg");
-//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
-//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/1.mp4", "output6.mp4");
-//            writeFileToDisk(fs, "/home/rogue/Desktop/Files/FYP/Project/FYP/large.mp4", "outputLarge.mp4");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file1.jpg", "output1.jpg");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file2.jpg", "output2.jpg");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file3.jpg", "output3.jpg");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file4.jpg", "output4.jpg");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.mp4", "output6.mp4");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/large.mp4", "outputLarge.mp4");
 //            fs.removeDirectory("/Obama1", true);
 //            fs.ls("/");
 //            fs.ls("/");
-//            fs.printTree();
-            thumbnailGeneration();
+            fs.printTree();
+//            thumbnailGeneration();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
         }

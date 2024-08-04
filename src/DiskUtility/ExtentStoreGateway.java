@@ -17,14 +17,18 @@ import java.util.LinkedList;
 class ExtentStoreGateway {
     private final BitMapUtility bitMapUtility;
     private final SecretKey key;
-    private File extentStoreFile;
-    ExtentStoreGateway(Path path, BitMapUtility bitMapUtility, SecretKey key) throws Exception{
-        File file = path.resolve("extent-store").toFile();
-        if (!file.exists())
-            throw new Exception("Extent Store File Does Not Exist.");
+    private final File extentStoreFile;
+
+    ExtentStoreGateway(File baseFile, BitMapUtility bitMapUtility, SecretKey key) throws Exception{
+        File file;
+        try {
+            file = Gateway.getFileInBaseDirectory(baseFile, Store.ExtentStore.fileName);
+        } catch (Exception e){
+            throw new Exception("Unable to Initialize ExtentStore: ExtentStore File Inaccessible -- " + e.getMessage());
+        }
+        extentStoreFile = file;
         this.bitMapUtility = bitMapUtility;
         this.key = key;
-        extentStoreFile = file;
     }
     static class ExtentFrame {
         long dataStoreIndex;
@@ -278,10 +282,14 @@ class ExtentStoreGateway {
      * Store
      * @param extentFrames LinkedList of the ExtentFrames that need to be removed.
      */
-    public void removeExtentEntry(LinkedList<ExtentFrame> extentFrames){
+    public void removeExtentEntry(LinkedList<ExtentFrame> extentFrames) throws Exception{
         // Only need to change the bitmap utility to show the occupied locations as empty and that's it.
         for (ExtentFrame extentFrame : extentFrames) {
-            bitMapUtility.setIndexExtentStore(extentFrame.nextAddress, false);
+            try {
+                bitMapUtility.setIndexExtentStore(extentFrame.nextAddress, false);
+            } catch (Exception e){
+                throw new Exception("Unable to remove Extent Entry: " + e.getMessage());
+            }
         }
     }
 }

@@ -172,16 +172,20 @@ class DataStoreGateway {
         }
     }
 
-    private File dataStoreFile;
+    private final File dataStoreFile;
     private final BitMapUtility bitMapUtility;
     private final SecretKey key;
-    DataStoreGateway(Path path, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
-        File file = path.resolve("data-store").toFile();
-        if (!file.exists())
-            throw new Exception("Directory Store File Does Not Exist.");
+
+    DataStoreGateway(File baseFile, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
+        File file;
+        try {
+            file = Gateway.getFileInBaseDirectory(baseFile, Store.DataStore.fileName);
+        } catch (Exception e){
+            throw new Exception("Unable to Initialize DataStore: DataStore File Inaccessible -- " + e.getMessage());
+        }
+        dataStoreFile = file;
         this.bitMapUtility = bitMapUtility;
         this.key = key;
-        dataStoreFile = file;
     }
 
     LinkedList<ExtentStoreGateway.ExtentFrame> addNode(File file) throws Exception{

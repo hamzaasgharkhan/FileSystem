@@ -1,11 +1,12 @@
 package FileSystem;
-import Constants.FLAGS;
-import DiskUtility.*;
 
-import javax.crypto.SecretKey;
-import java.io.FileInputStream;
+import Constants.FLAGS;
+import DiskUtility.Crypto;
+import DiskUtility.CustomInputStream;
+import DiskUtility.Gateway;
+
+import java.io.File;
 import java.nio.file.Path;
-import java.security.SecureRandom;
 import java.util.LinkedList;
 
 /**
@@ -27,13 +28,16 @@ public class FileSystem {
      * It will also call the init function to create all the requisite data structures and files.
      * @return A FileSystem instance
      */
-    public static FileSystem createFileSystem(Path path, String fileSystemName, String password) throws Exception {
+    public static FileSystem createFileSystem(File baseFile, String fileSystemName, String password) throws Exception {
         FileSystem fs = new FileSystem();
         Crypto.init();
         SuperBlock superBlock = new SuperBlock(fileSystemName);
-        path = path.resolve(fileSystemName);
+        if (!baseFile.isDirectory()){
+            throw new Exception("FileSystem Creation Failed: Provided baseFile does not point to a directory");
+        }
+        File fileSystemBaseFile = new File(baseFile, fileSystemName);
         try{
-            fs.gateway = new Gateway(path, superBlock, password, true);
+            fs.gateway = new Gateway(fileSystemBaseFile, superBlock, password, true);
             fs.dir = new NodeTree();
             fs.gateway.addNode(fs.dir.getDirtyNodes().pop());
         } catch (Exception e){
@@ -43,13 +47,13 @@ public class FileSystem {
     }
 
     /**
-     * This method initializes takes the path of the parent directory of the filesystem files. It initializes all the
+     * This method initializes takes the path of the root directory of the filesystem files. It initializes all the
      * fields of the FileSystem.
      * @return true if and only if the init method was successful.
      */
-    public static FileSystem mount(Path path, String password) throws Exception{
+    public static FileSystem mount(File baseFile, String password) throws Exception{
         Crypto.init();
-        return Gateway.mountFileSystem(new FileSystem(), path, password);
+        return Gateway.mountFileSystem(new FileSystem(), baseFile, password);
     }
 
     /**

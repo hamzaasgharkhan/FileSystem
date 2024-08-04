@@ -5,13 +5,14 @@ import Constants.VALUES;
 import Utilities.BinaryUtilities;
 
 import javax.crypto.SecretKey;
+import java.io.File;
 import java.nio.file.Path;
 
 /**
  * This class provides an interface between the ThumbnailStore files and the rest of the filesystem.
  */
 public class ThumbnailStoreGateway {
-    public ThumbnailStoreGateway(Path path, BitMapUtility bitMapUtility, SecretKey key) {
+    public ThumbnailStoreGateway(File baseFile, BitMapUtility bitMapUtility, SecretKey key) {
         // FIX CONSTRUCTOR
     }
 

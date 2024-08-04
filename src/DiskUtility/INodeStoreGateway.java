@@ -18,16 +18,19 @@ import java.nio.file.attribute.BasicFileAttributes;
  */
 public class INodeStoreGateway {
     // Denotes the extentFrame
-    private File iNodeFile;
+    private final File iNodeFile;
     private final BitMapUtility bitMapUtility;
     private final SecretKey key;
-    public INodeStoreGateway(Path path, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
-        File file = path.resolve("inode-store").toFile();
-        if (!file.exists())
-            throw new Exception("Directory Store File Does Not Exist.");
+    public INodeStoreGateway(File baseFile, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
+        File file;
+        try {
+            file = Gateway.getFileInBaseDirectory(baseFile, Store.INodeStore.fileName);
+        } catch (Exception e){
+            throw new Exception("Unable to Initialize INodeStore: INodeStore file Inaccessible -- " + e.getMessage());
+        }
+        this.iNodeFile = file;
         this.bitMapUtility = bitMapUtility;
         this.key = key;
-        iNodeFile = file;
     }
 
     public INode addNode(Path path, long[] extentDetails, long thumbnailStoreAddress) throws Exception{
@@ -118,10 +121,14 @@ public class INodeStoreGateway {
      * This method takes an INodeAddress and removes the INode Entry from the FileSystem
      * @param iNodeAddress Target INode Address
      */
-    public void removeINode(long iNodeAddress){
+    public void removeINode(long iNodeAddress) throws Exception{
         // Remove the bitmap entry
         // Delete the entry in case if it is the last one.
-        bitMapUtility.setIndexINodeStore(iNodeAddress, false);
+        try {
+            bitMapUtility.setIndexINodeStore(iNodeAddress, false);
+        } catch (Exception e){
+            throw new Exception("Unable to Remove INode: " +  e.getMessage());
+        }
     }
 
     /**

@@ -84,13 +84,16 @@ public class DirectoryStoreGateway{
             return (nextSiblingIndex != index);
         }
     }
-    private File directoryStoreFile;
+    private final File directoryStoreFile;
     private final BitMapUtility bitMapUtility;
     private final SecretKey key;
-    public DirectoryStoreGateway(Path path, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
-        File file = path.resolve("directory-store").toFile();
-        if (!file.exists())
-            throw new Exception("Directory Store File Does Not Exist.");
+    public DirectoryStoreGateway(File baseFile, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
+        File file;
+        try {
+            file = Gateway.getFileInBaseDirectory(baseFile, Store.DirectoryStore.fileName);
+        } catch (Exception e){
+            throw new Exception("Unable to Initialize DirectoryStore: DirectoryStoreFile Inaccessible -- " + e.getMessage());
+        }
         directoryStoreFile = file;
         this.bitMapUtility = bitMapUtility;
         this.key = key;

@@ -10,6 +10,7 @@ import FileSystem.INode;
 
 import javax.crypto.SecretKey;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,13 +41,16 @@ public class Gateway {
     private final DataStoreGateway dataStoreGateway;
     private final ThumbnailStoreGateway thumbnailStoreGateway;
     private final BitMapUtility bitMapUtility;
-    private final Path basePath;
+    /**
+     * Points to the root directory of the filesystem
+     */
+    private final File baseFile;
     protected final SecretKey superBlockKey;
     protected SecretKey key;
 
-    public Gateway(Path basePath, SuperBlock superBlock, String password, boolean firstCreation) throws Exception{
+    public Gateway(File baseFile, SuperBlock superBlock, String password, boolean firstCreation) throws Exception{
         this.superBlock = superBlock;
-        this.basePath = basePath;
+        this.baseFile = baseFile;
         this.superBlockKey = Crypto.deriveKeyFromPassword(password, new byte[VALUES.SALT_SIZE]);;
         if (firstCreation){
             byte[] salt = new byte[VALUES.SALT_SIZE];
@@ -54,27 +58,38 @@ public class Gateway {
             this.key = Crypto.deriveKeyFromPassword(password, salt);
             this.superBlock.setSalt(salt);
             initializeFileSystem();
-            this.bitMapUtility = new BitMapUtility(basePath, true);
+            this.bitMapUtility = new BitMapUtility(baseFile, true);
         } else {
-            this.bitMapUtility = new BitMapUtility(basePath);
+            if (!baseFile.isDirectory()){
+                throw new Exception("Gateway Initialization Error: FileSystem Root Directory Does Not Exist or Inaccessible");
+            }
+            this.bitMapUtility = new BitMapUtility(baseFile);
             this.key = Crypto.deriveKeyFromPassword(password, this.superBlock.getSalt());
         }
-        this.directoryStoreGateway = new DirectoryStoreGateway(basePath, bitMapUtility, key);
-        this.iNodeStoreGateway = new INodeStoreGateway(basePath, bitMapUtility, key);
-        this.extentStoreGateway = new ExtentStoreGateway(basePath, bitMapUtility, key);
-        this.dataStoreGateway = new DataStoreGateway(basePath, bitMapUtility, key);
-        this.thumbnailStoreGateway = new ThumbnailStoreGateway(basePath, bitMapUtility, key);
+        this.directoryStoreGateway = new DirectoryStoreGateway(baseFile, bitMapUtility, key);
+        this.iNodeStoreGateway = new INodeStoreGateway(baseFile, bitMapUtility, key);
+        this.extentStoreGateway = new ExtentStoreGateway(baseFile, bitMapUtility, key);
+        this.dataStoreGateway = new DataStoreGateway(baseFile, bitMapUtility, key);
+        this.thumbnailStoreGateway = new ThumbnailStoreGateway(baseFile, bitMapUtility, key);
     }
 
-    public Gateway(Path path, SuperBlock superBlock, String password) throws Exception{
-        this(path,  superBlock, password, false);
+    public Gateway(File baseFile, SuperBlock superBlock, String password) throws Exception{
+        this(baseFile,  superBlock, password, false);
     }
     /**
      * This method initializes the directory for the FileSystem and creates all the necessary files.
      */
     protected void initializeFileSystem() throws Exception{
         try {
-            Files.createDirectory(basePath);
+            if (baseFile.exists()){
+                if (!baseFile.delete()){
+                    throw new Exception("FileSystem Creation Failed: Directory with the same name as the FileSystem already" +
+                            "exists. Unable to delete the existing directory.");
+                }
+            }
+            if (!baseFile.mkdir()){
+                throw new Exception("FileSystem Creation Failed: Unable to create parentDirectory for FileSystem");
+            }
             __createSuperBlockFile();
             __createStores();
         } catch (Exception e) {
@@ -85,42 +100,36 @@ public class Gateway {
     /**
      * This method takes the path of the root directory of the FileSystem and returns the FileSystem contained within
      * that directory
-     * @param path Path of the root directory of the FileSystem
+     * @param baseFile Path of the root directory of the FileSystem
      * @return FileSystem object containing the FileSystem at the provided path.
      */
-    public static FileSystem mountFileSystem(FileSystem fs, Path path, String password) throws Exception {
-        File file = path.toFile();
-        if (!file.exists() || !file.isDirectory())
+    public static FileSystem mountFileSystem(FileSystem fs, File baseFile, String password) throws Exception {
+        if (!baseFile.isDirectory())
             throw new IllegalArgumentException("Invalid Path.");
-        File superBlockFile = new File(path + "/super-block");
-        if (!superBlockFile.exists())
-            throw new Exception("SuperBlock File Does Not Exist.");
+        File superBlockFile;
+        try {
+            superBlockFile = getFileInBaseDirectory(baseFile, "super-block");
+        } catch (Exception e){
+            throw new Exception("Unable to get SuperBlock: " + e.getMessage());
+        }
         SecretKey key = Crypto.deriveKeyFromPassword(password, new byte[16]);
-        SuperBlock superBlock = SuperBlockGateway.getSuperBlock(path, key);
-        fs.setSuperBlock(superBlock);
-        fs.setGateway(new Gateway(path, superBlock, password));
+        SuperBlock superBlock = SuperBlockGateway.getSuperBlock(baseFile, key);
+        fs.setGateway(new Gateway(baseFile, superBlock, password));
         fs.setDir(fs.getGateway().directoryStoreGateway.mount());
         return fs;
     }
 
     private void __createStores() throws Exception{
-        // Directory store is not added to this list as it will not be empty.
-        String[] storeNames = {
-                "extent-store",
-                "inode-store",
-                "data-store",
-                "thumbnail-store"
-        };
-        for (String storeName: storeNames){
-            try {
-                Files.createFile(basePath.resolve(storeName));
-            } catch (IOException e){
-                throw new Exception("Error Initializing File System Store: " + storeName);
-            }
+
+        for (Store store: Store.values()){
+            createFileInBaseDirectory(baseFile, store.fileName);
         }
         try {
             byte[] directoryStoreByteArray = Crypto.encryptBlock(DirectoryStoreGateway.getDefaultBytes(), key, DIRECTORY_STORE_FRAME.SIZE);
-            Files.write(basePath.resolve("directory-store"), directoryStoreByteArray);
+            File directoryStoreFile = getFileInBaseDirectory(baseFile, Store.DirectoryStore.fileName);
+            FileOutputStream fout = new FileOutputStream(directoryStoreFile);
+            fout.write(directoryStoreByteArray);
+            fout.close();
         } catch (IOException e){
             throw new Exception("Error Initializing File System Store: directory-store");
         } catch (Exception e){
@@ -129,10 +138,12 @@ public class Gateway {
     }
 
     private void __createSuperBlockFile() throws Exception{
-        Path path = Paths.get(superBlock.getFileSystemName() + "/super-block");
+        File superBlockFile = createFileInBaseDirectory(baseFile,"super-block");
         try {
             byte[] superBlockArray = Crypto.encryptBlock(SuperBlockGateway.getBytes(superBlock), superBlockKey, SUPER_BLOCK_BASE_FRAME.SIZE);
-            Files.write(path, superBlockArray);
+            FileOutputStream fout = new FileOutputStream(superBlockFile);
+            fout.write(superBlockArray);
+            fout.close();
         } catch (IOException e){
             throw new IOException("[Gateway] __createSuperBlockFile failed.\n" + e.getMessage());
         } catch (Exception e){
@@ -192,5 +203,35 @@ public class Gateway {
         INode iNode = iNodeStoreGateway.getINode(node.getiNodeAddress());
         LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames = extentStoreGateway.getExtentFrames(iNode.getExtentStoreAddress(), iNode.getExtentCount());
         return new NodeEntry(node, iNode, extentFrames);
+    }
+
+    /**
+     * This method creates an empty file of the given name within the FileSystem baseDirectory. If a file by the provided name
+     * exists, the method attempts to delete the file.
+     * @param name Name of the new file.
+     * @return File object if and only if the File has been created
+     * @throws Exception In case the file was not created.
+     */
+    protected static File createFileInBaseDirectory(File baseDirectory, String name) throws Exception{
+        File file = new File(baseDirectory, name);
+        if (file.exists()){
+            if (!file.delete()){
+                throw new Exception("File Creation Failed. File already exists in the base directory. Unable to delete" +
+                        "existing file: " + file);
+            }
+        }
+        if (!file.createNewFile()){
+            throw new Exception("File Creation Failed: " + file);
+        }
+        return file;
+    }
+
+    protected static File getFileInBaseDirectory(File baseDirectory, String name) throws Exception{
+        File file = new File(baseDirectory, name);
+        if (!file.isFile()){
+            throw new Exception("Unable to Get File. The provided name does need have a file associated with it in " +
+                    "the base directory or is inaccessible (potentially due to lack of permissions)");
+        }
+        return file;
     }
 }
