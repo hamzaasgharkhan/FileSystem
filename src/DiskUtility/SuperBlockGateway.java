@@ -100,11 +100,8 @@ public abstract class SuperBlockGateway{
             throw new Exception("Unable to Get SuperBlock: " + e.getMessage());
         }
         byte[] byteArray;
-        FileInputStream fin;
         try {
-            fin = new FileInputStream(file);
-            byteArray = fin.readAllBytes();
-            fin.close();
+            byteArray = Gateway.readAllBytes(file);
         } catch (FileNotFoundException e){
             throw new Exception("Could Not Retrieve SuperBlock. SuperBlock File Not Found.\n" + e.getMessage());
         }

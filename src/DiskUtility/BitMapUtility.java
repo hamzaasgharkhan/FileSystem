@@ -125,12 +125,9 @@ public class BitMapUtility {
             String bitmapName = store.fileName + ".bitmap";
             byte[] array;
             File bitmapFile;
-            FileInputStream fin;
             try{
                 bitmapFile = Gateway.getFileInBaseDirectory(baseFile, bitmapName);
-                fin = new FileInputStream(bitmapFile);
-                array = fin.readAllBytes();
-                fin.close();
+                array = Gateway.readAllBytes(bitmapFile);
             } catch (Exception e){
                 throw new Exception("Unable to load bitmap: " + bitmapName + " --- " + e.getMessage());
             }

@@ -10,9 +10,7 @@ import FileSystem.SuperBlock;
 import FileSystem.InputFile;
 
 import javax.crypto.SecretKey;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.security.SecureRandom;
 import java.util.LinkedList;
 
@@ -231,5 +229,19 @@ public class Gateway {
                     "the base directory or is inaccessible (potentially due to lack of permissions)");
         }
         return file;
+    }
+
+    protected static byte[] readAllBytes(File file) throws IOException{
+        try (InputStream inputStream = new FileInputStream(file);
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()){
+
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+
+            while ((bytesRead = inputStream.read(buffer)) != -1){
+                byteArrayOutputStream.write(buffer, 0, bytesRead);
+            }
+            return byteArrayOutputStream.toByteArray();
+        }
     }
 }
