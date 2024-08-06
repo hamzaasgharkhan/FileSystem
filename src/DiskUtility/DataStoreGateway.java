@@ -6,7 +6,6 @@ import Utilities.BinaryUtilities;
 import javax.crypto.SecretKey;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.LinkedList;
 
@@ -107,7 +106,7 @@ class DataStoreGateway {
                             end = BinaryUtilities.getFirstUsedIndex(arr[i], j);
                             if (end == -1){
                                 // If it is the last byte, set the last index as the end and return runs.
-                                if (i == 471){
+                                if (i == DATA_STORE_BLOCK_FRAME.FIRST_DATA_BYTE_INDEX - 1){      /*TODO CHECK WHY THIS IS ALWAYS FALSE*/
                                     end = (i - DATA_STORE_BLOCK_FRAME.BITMAP_INDEX) * 8 + 7;
                                     runs.add(start);
                                     runs.add(end + 1 - start); // To convert indices into length, add 1 to account for the 0 index.
@@ -173,30 +172,44 @@ class DataStoreGateway {
         }
     }
 
-    private final File dataStoreFile;
+    private final File storeFile;
     private final BitMapUtility bitMapUtility;
     private final SecretKey key;
+    private final Store store;
 
-    DataStoreGateway(File baseFile, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
+    DataStoreGateway(File baseFile, BitMapUtility bitMapUtility, SecretKey key, Store store) throws Exception {
         File file;
-        try {
-            file = Gateway.getFileInBaseDirectory(baseFile, Store.DataStore.fileName);
-        } catch (Exception e){
-            throw new Exception("Unable to Initialize DataStore: DataStore File Inaccessible -- " + e.getMessage());
-        }
-        dataStoreFile = file;
+        this.store = store;
         this.bitMapUtility = bitMapUtility;
+        try {
+            file = Gateway.getFileInBaseDirectory(baseFile, store.fileName);
+        } catch (Exception e){
+            throw new Exception("Unable to Initialize " + store.name() + ": " + store.fileName + " Inaccessible -- " + e.getMessage());
+        }
+        storeFile = file;
         this.key = key;
     }
+
+    DataStoreGateway(File baseFile, BitMapUtility bitMapUtility, SecretKey key) throws Exception {
+        this(baseFile, bitMapUtility, key, Store.DataStore);
+    }
+
 
     LinkedList<ExtentStoreGateway.ExtentFrame> addNode(InputFile file) throws Exception{
         // A LinkedList of ExtentFrame that will be used in the end to create extents that span across multiple blocks.
         LinkedList<ExtentStoreGateway.ExtentFrame> extentFramesLinkedList = new LinkedList<ExtentStoreGateway.ExtentFrame>();
-        long fileSize, bytesToWrite, index;
+        long fileSize = 0, bytesToWrite = 0, index;
         // The bytesOccupied field of the block
         short bytesOccupied;
         // user input file.
-        InputStream fileInputStream = file.fileInputStream;
+        InputStream fileInputStream = null;
+        if (store == Store.DataStore){
+            fileInputStream = file.fileInputStream;
+            bytesToWrite = fileSize = file.size;
+        } else if (store == Store.ThumbnailStore){
+            fileInputStream = file.thumbnailInputStream;
+            bytesToWrite = fileSize = file.thumbnailSize;
+        }
         // pointer within the inputBlock
         int pointer = 0;
         // Contains the data of the user input file
@@ -205,7 +218,6 @@ class DataStoreGateway {
         int inputBlocksRead = 0;
         // Contains a data block within data-store
         byte[] dataBlock = new byte[DATA_STORE_BLOCK_FRAME.SIZE];
-        bytesToWrite = fileSize = file.size;
         if (fileSize == 0L)
             throw new Exception("File is Empty.");
         if (fileInputStream == null){
@@ -223,8 +235,8 @@ class DataStoreGateway {
         while (bytesToWrite > 0){
             int bytesWrittenFromRunningInputBlock = 0;
             Arrays.fill(dataBlock, (byte)0);
-            index = bitMapUtility.getFreeIndexDataStore(bytesToWrite);
-            if (bitMapUtility.isIndexOccupiedDataStore(index)){
+            index = bitMapUtility.getFreeIndex(store, bytesToWrite);
+            if (bitMapUtility.isIndexOccupied(store, index)){
                 try {
                         __updateDataBlockArray(dataBlock, index);
                 } catch (EOFException e){
@@ -303,7 +315,7 @@ class DataStoreGateway {
             }
             DataBlock.setBytesOccupied(dataBlock, bytesOccupied);
 //            DataBlock.setHash();
-            bitMapUtility.setIndexDataStore(index, bytesOccupied); // FIX THIS METHOD TO TAKE THE NUMBER OF BYTE THAT ARE OCCUPIED BY THE BLOCK NOW. THE BITMAP SHOULD DECIDE TH EBITMAP
+            bitMapUtility.setIndex(store, index, bytesOccupied); // FIX THIS METHOD TO TAKE THE NUMBER OF BYTE THAT ARE OCCUPIED BY THE BLOCK NOW. THE BITMAP SHOULD DECIDE TH EBITMAP
             try {
                 __updateDataBlockFile(dataBlock, index);
             } catch (IOException e){
@@ -315,9 +327,14 @@ class DataStoreGateway {
 
     private void __fillInputBlock(InputStream fileInputStream, byte[] inputBlock, int bytesToRead) throws Exception{
         try {
-            int bytesRead = fileInputStream.readNBytes(inputBlock, 0, bytesToRead);
-            if (bytesRead != bytesToRead){
-                throw new Exception("Number of bytes read is not the same as number of bytes requested");
+            int bytesRead = 0;
+            while (bytesRead < bytesToRead) {
+                int remainingBytes = bytesToRead - bytesRead;
+                int result = fileInputStream.read(inputBlock, bytesRead, remainingBytes);
+                if (result == -1) {
+                    throw new EOFException("End of File Reached");
+                }
+                bytesRead += result;
             }
         } catch (FileNotFoundException e){
             throw new Exception("File being added by user not found or data-store file not found." + e.getMessage());
@@ -427,7 +444,7 @@ class DataStoreGateway {
     protected void __updateDataBlockFile(byte[] dataBlock, long address) throws Exception{
         RandomAccessFile fin;
         try {
-            fin = new RandomAccessFile(dataStoreFile, "rw");
+            fin = new RandomAccessFile(storeFile, "rw");
         } catch (FileNotFoundException e){
             throw new Exception("DataStore FileNotFound: RemoveNode -- DataStoreGateway" + e.getMessage());
         }
@@ -475,9 +492,9 @@ class DataStoreGateway {
         byte[] byteArray = new byte[DATA_STORE_BLOCK_FRAME.FULL_SIZE];
         RandomAccessFile fin;
         try {
-            fin = new RandomAccessFile(dataStoreFile, "r");
+            fin = new RandomAccessFile(storeFile, "r");
         } catch (FileNotFoundException e){
-            throw new Exception("DataStore FileNotFound: RemoveNode -- DataStoreGateway" + e.getMessage());
+            throw new Exception("DataStore FileNotFound: " + store.fileName + " " + e.getMessage());
         }
         try {
             fin.seek(address * DATA_STORE_BLOCK_FRAME.FULL_SIZE);

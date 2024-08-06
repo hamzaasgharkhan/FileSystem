@@ -24,10 +24,12 @@ public class Gateway {
         Node node;
         INode iNode;
         LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames;
-        NodeEntry(Node node, INode iNode, LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames){
+        LinkedList<ExtentStoreGateway.ExtentFrame> thumbnailExtentFrames;
+        NodeEntry(Node node, INode iNode, LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames, LinkedList<ExtentStoreGateway.ExtentFrame> thumbnailExtentFrames){
             this.node = node;
             this.iNode = iNode;
             this.extentFrames = extentFrames;
+            this.thumbnailExtentFrames = thumbnailExtentFrames;
         }
     }
     private final SuperBlock superBlock;
@@ -158,13 +160,22 @@ public class Gateway {
         return directoryStoreGateway;
     }
     public DataStoreGateway getDataStoreGateway() {return dataStoreGateway;}
+    public ThumbnailStoreGateway getThumbnailStoreGateway() {return thumbnailStoreGateway;}
+    public INodeStoreGateway getiNodeStoreGateway() {return iNodeStoreGateway;}
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //  Adding actual data files.
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     public INode addFile(InputFile file) throws Exception{
         long[] extentStoreDetails = extentStoreGateway.addExtentEntry(dataStoreGateway.addNode(file));
-        long thumbnailStoreAddress = thumbnailStoreGateway.addNode(file);
+        long[] thumbnailExtentStoreDetails = null;
+        if (file.thumbnailInputStream != null){
+            thumbnailExtentStoreDetails = extentStoreGateway.addExtentEntry(thumbnailStoreGateway.addNode(file));
+        }
+        // FIX THIS
+//        long thumbnailStoreAddress = thumbnailStoreGateway.addNode(file);
         file.close();
+        long thumbnailStoreAddress = iNodeStoreGateway.addThumbnailNode(file, thumbnailExtentStoreDetails).getiNodeAddress();
         return iNodeStoreGateway.addNode(file, extentStoreDetails, thumbnailStoreAddress);
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,9 +184,12 @@ public class Gateway {
     public void removeNode(Node node) throws Exception{
         NodeEntry nodeEntry = __getNodeDetails(node);
         dataStoreGateway.removeNode(nodeEntry.extentFrames);
-        thumbnailStoreGateway.removeNode(nodeEntry.iNode.getThumbnailStoreAddress());
+        thumbnailStoreGateway.removeNode(nodeEntry.thumbnailExtentFrames);
+        // FIX THIS
         extentStoreGateway.removeExtentEntry(nodeEntry.extentFrames);
+        extentStoreGateway.removeExtentEntry(nodeEntry.thumbnailExtentFrames);
         iNodeStoreGateway.removeINode(nodeEntry.iNode.getiNodeAddress());
+        iNodeStoreGateway.removeINode(nodeEntry.iNode.getThumbnailStoreAddress());
         directoryStoreGateway.removeNode(node);
     }
 
@@ -185,6 +199,13 @@ public class Gateway {
         directoryStoreGateway.removeNode(node);
     }
 
+    public INode getINode(Node node) throws Exception{
+        return iNodeStoreGateway.getINode(node.getiNodeAddress());
+    }
+
+    public INode getINode(long iNodeAddress) throws Exception{
+        return iNodeStoreGateway.getINode(iNodeAddress);
+    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //  HELPER METHODS
@@ -195,10 +216,27 @@ public class Gateway {
      * @param node The target Node
      * @return NodeEntry object containing the details regarding the node.
      */
-    protected NodeEntry __getNodeDetails(Node node) throws Exception{
+    NodeEntry __getNodeDetails(Node node) throws Exception{
         INode iNode = iNodeStoreGateway.getINode(node.getiNodeAddress());
         LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames = extentStoreGateway.getExtentFrames(iNode.getExtentStoreAddress(), iNode.getExtentCount());
-        return new NodeEntry(node, iNode, extentFrames);
+        LinkedList<ExtentStoreGateway.ExtentFrame> thumbnailFrames = null;
+        long thumbnailAddress = iNode.getThumbnailStoreAddress();
+        if (thumbnailAddress != -1){
+            INode thumbnailINode = iNodeStoreGateway.getINode(thumbnailAddress);
+            thumbnailFrames = extentStoreGateway.getExtentFrames(thumbnailINode.getExtentStoreAddress(), thumbnailINode.getExtentCount());
+        }
+        return new NodeEntry(node, iNode, extentFrames, thumbnailFrames);
+    }
+
+    NodeEntry __getINodeDetails(INode iNode) throws Exception{
+        LinkedList<ExtentStoreGateway.ExtentFrame> extentFrames = extentStoreGateway.getExtentFrames(iNode.getExtentStoreAddress(), iNode.getExtentCount());
+        LinkedList<ExtentStoreGateway.ExtentFrame> thumbnailFrames = null;
+        long thumbnailAddress = iNode.getThumbnailStoreAddress();
+        if (thumbnailAddress != -1){
+            INode thumbnailINode = iNodeStoreGateway.getINode(thumbnailAddress);
+            thumbnailFrames = extentStoreGateway.getExtentFrames(thumbnailINode.getExtentStoreAddress(), thumbnailINode.getExtentCount());
+        }
+        return new NodeEntry(null, iNode, extentFrames, thumbnailFrames);
     }
 
     /**
@@ -240,6 +278,22 @@ public class Gateway {
 
             while ((bytesRead = inputStream.read(buffer)) != -1){
                 byteArrayOutputStream.write(buffer, 0, bytesRead);
+            }
+            return byteArrayOutputStream.toByteArray();
+        }
+    }
+
+    protected static byte[] readNBytes(File file, byte[] buffer, int bytesToRead) throws IOException{
+        try (InputStream inputStream = new FileInputStream(file);
+             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()){
+
+            int bytesRead;
+
+            while (((bytesRead = inputStream.read(buffer)) != bytesToRead) && (bytesRead != -1)){
+                byteArrayOutputStream.write(buffer, 0, bytesRead);
+            }
+            if (bytesRead == -1){
+                throw new EOFException("End of File Reached");
             }
             return byteArrayOutputStream.toByteArray();
         }

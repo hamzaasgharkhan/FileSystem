@@ -7,10 +7,7 @@ import FileSystem.InputFile;
 import Utilities.BinaryUtilities;
 
 import javax.crypto.SecretKey;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -34,13 +31,25 @@ public class INodeStoreGateway {
         this.key = key;
     }
 
-    public INode addNode(InputFile file, long[] extentDetails, long thumbnailStoreAddress) throws Exception{
-        long iNodeAddress;
+    public INode addThumbnailNode(InputFile file, long[] extentDetails)throws Exception{
         INode iNode;
         RandomAccessFile fin;
-        iNodeAddress = bitMapUtility.getFreeIndexINodeStore();
         iNode = new INode();
-        iNode.setiNodeAddress(iNodeAddress);
+        iNode.setiNodeSize(file.thumbnailSize);
+        iNode.setCreationTime(file.creationTime);
+        iNode.setLastModifiedTime(file.lastModifiedTime);
+        iNode.setExtentStoreAddress(extentDetails[0]);
+        iNode.setExtentCount(extentDetails[1]);
+        iNode.setThumbnailStoreAddress(-1);
+        iNode.setFlags(FLAGS.DEFAULT_INODE);
+        writeINode(iNode);
+        return iNode;
+    }
+
+    public INode addNode(InputFile file, long[] extentDetails, long thumbnailStoreAddress) throws Exception{
+        INode iNode;
+        RandomAccessFile fin;
+        iNode = new INode();
         iNode.setiNodeSize(file.size);
         iNode.setCreationTime(file.creationTime);
         iNode.setLastModifiedTime(file.lastModifiedTime);
@@ -48,6 +57,13 @@ public class INodeStoreGateway {
         iNode.setExtentCount(extentDetails[1]);
         iNode.setThumbnailStoreAddress(thumbnailStoreAddress);
         iNode.setFlags(FLAGS.DEFAULT_INODE);
+        writeINode(iNode);
+        return iNode;
+    }
+
+    public long writeINode(INode iNode) throws Exception{
+        RandomAccessFile fin;
+        long iNodeAddress = bitMapUtility.getFreeIndex(Store.INodeStore);
         try {
             fin = new RandomAccessFile(iNodeFile, "rw");
         } catch (FileNotFoundException e){
@@ -71,7 +87,8 @@ public class INodeStoreGateway {
             throw new Exception("Unable to close INODE_STORE file." + e.getMessage());
         }
         bitMapUtility.setIndexINodeStore(iNodeAddress, true);
-        return iNode;
+        iNode.setiNodeAddress(iNodeAddress);
+        return iNodeAddress;
     }
 
     /**

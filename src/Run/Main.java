@@ -45,23 +45,24 @@ public class Main {
             if (!largePath.toFile().exists()) {
                 throw new Exception("NO SUCH FILE.");
             }
-            long file1CreationTime, file1LastModifiedTime, file1Size;
+            long fileCreationTime, fileLastModifiedTime, fileSize;
             try {
-                BasicFileAttributes attributes = Files.readAttributes(path1, BasicFileAttributes.class);
-                file1CreationTime = attributes.creationTime().toMillis();
-                file1LastModifiedTime = attributes.lastModifiedTime().toMillis();
-                file1Size = attributes.size();
+                BasicFileAttributes attributes = Files.readAttributes(path5, BasicFileAttributes.class);
+                fileCreationTime = attributes.creationTime().toMillis();
+                fileLastModifiedTime = attributes.lastModifiedTime().toMillis();
+                fileSize = attributes.size();
             } catch (IOException e){
                 throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
             }
-            InputFile file1 = new InputFile(
-                    path1.getFileName().toString(),
+            InputFile file5 = new InputFile(
+                    path5.getFileName().toString(),
                     parentPath.toAbsolutePath().toString(),
-                    file1Size,
-                    file1CreationTime,
-                    file1LastModifiedTime,
-                    new FileInputStream(path1.toFile()),
-                    null
+                    fileSize,
+                    fileCreationTime,
+                    fileLastModifiedTime,
+                    new FileInputStream(path5.toFile()),
+                    new FileInputStream("testThumbnail.jpg"),
+                    new File("testThumbnail.jpg").length()
             );
 //            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
             fs = FileSystem.mount(mountPath, "kratos123");
@@ -72,7 +73,7 @@ public class Main {
 //            fs.createDirectory("/Obama1","Obama2");
 //            fs.createDirectory("/Obama1/Obama2","Obama3");
 //            fs.createDirectory("/Obama1/Obama2/Obama3","Obama4");
-//            fs.addFile(file1);
+//            fs.addFile(file5);
 //            fs.addFile(path2);
 //            fs.removeNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/file1.jpg");
 //            fs.addFile(path3);
@@ -81,11 +82,11 @@ public class Main {
 //            fs.addFile(path5);
 //            fs.addFile(path6);
 //            fs.addFile(largePath);
-            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file1.jpg", "output1.jpg");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file1.jpg", "output1.jpg");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file2.jpg", "output2.jpg");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file3.jpg", "output3.jpg");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file4.jpg", "output4.jpg");
-//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
+            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.mp4", "output6.mp4");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/large.mp4", "outputLarge.mp4");
 //            fs.removeDirectory("/Obama1", true);
@@ -106,6 +107,15 @@ public class Main {
             fout.write(buffer, 0, len);
         }
         fin.close();
+        fout.close();
+        CustomInputStream thumbnail = fs.openThumbnail(path);
+        fout = new FileOutputStream("thumbnail.jpg");
+        len = 0;
+        buffer = new byte[4096];
+        while ((len = thumbnail.read(buffer)) != -1) {
+            fout.write(buffer, 0, len);
+        }
+        thumbnail.close();
         fout.close();
     }
     public static void thumbnailGeneration(){

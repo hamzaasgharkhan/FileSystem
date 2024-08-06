@@ -266,8 +266,7 @@ public class BitMapUtility {
             }
             if ((dataStoreByte & 0b11110000) != 0b11110000) {
                 return (long)i * 2L;
-            }
-            else {
+            } else {
                 return (i * 2L) + 1;
             }
         }
@@ -315,7 +314,7 @@ public class BitMapUtility {
         }
         int byteIndex = (int) (index / 2L);
         int bitIndex = (int) (index % 2L);
-        byte targetByte = dataStoreBitMap[byteIndex];
+        byte targetByte = bitmap[byteIndex];
         // Update the byte.
         if (bitIndex == 1)
             targetByte = (byte)((targetByte & (byte)0b11110000) | (newBitmap & (byte)0b00001111));
@@ -347,6 +346,47 @@ public class BitMapUtility {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // AUXILIARY METHODS
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    protected long getFreeIndex(Store store) throws Exception{
+        if (store.bitmapType == BitmapType.Singular){
+            return getFreeIndexSingularBitmap(store);
+        } else {
+            throw new Exception("Invalid Store. Method only valid for Singular Bitmap");
+        }
+    }
+
+    protected long getFreeIndex(Store store, long bytesToWrite) throws Exception{
+        if (store.bitmapType == BitmapType.Half){
+            return getFreeIndexHalfBitmap(store, bytesToWrite);
+        } else {
+            throw new Exception("Invalid Store. Method only valid for Half Bitmap");
+        }
+    }
+
+    protected void setIndex(Store store, long index, boolean value) throws Exception{
+        if (store.bitmapType == BitmapType.Singular){
+            setIndexSingularBitmap(store, index, value);
+        } else {
+            throw new Exception("Invalid Store. Method only valid for Singular Bitmap");
+        }
+    }
+
+    protected void setIndex(Store store, long index, short bytesOccupied) throws Exception{
+        if (store.bitmapType == BitmapType.Half){
+            setIndexHalfBitmap(store, index, bytesOccupied);
+        } else {
+            throw new Exception("Invalid Store. Method only valid for Half Bitmap");
+        }
+    }
+
+    protected boolean isIndexOccupied(Store store, long index) throws Exception{
+        if (store.bitmapType == BitmapType.Half){
+            return isIndexOccupiedHalfBitmap(store, index);
+        } else {
+            throw new Exception("Invalid Store. Method only valid for Half Bitmap");
+        }
+    }
+
+
     protected long getFreeIndexDirectoryStore() throws Exception{
         return getFreeIndexSingularBitmap(Store.DirectoryStore);
     }

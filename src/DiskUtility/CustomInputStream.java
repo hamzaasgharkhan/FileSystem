@@ -1,9 +1,11 @@
 package DiskUtility;
 import Constants.DATA_STORE_BLOCK_FRAME;
+import FileSystem.INode;
 import FileSystem.Node;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.LinkedList;
 
 public class CustomInputStream extends InputStream{
     private Gateway gateway;
@@ -14,11 +16,13 @@ public class CustomInputStream extends InputStream{
     private Gateway.NodeEntry nodeEntry;
     private int currentExtent; // Index of the current extentFrame within the LinkedList of extentFrames.
     private long runningExtentPointer;
-    public CustomInputStream(Gateway gateway, Node node) throws Exception{
+    private boolean isThumbnail;
+    private DataStoreGateway dataStore;
+    public CustomInputStream(Gateway gateway, INode iNode, boolean isThumbnail) throws Exception{
         this.gateway = gateway;
         this.buffer = new byte[DATA_STORE_BLOCK_FRAME.FULL_SIZE];
         try{
-            this.nodeEntry = gateway.__getNodeDetails(node);
+            this.nodeEntry = gateway.__getINodeDetails(iNode);
         } catch (Exception e){
             System.out.println("Unable to create InputStream. Unable to get NodeEntry. " + e.getMessage());
         }
@@ -27,6 +31,15 @@ public class CustomInputStream extends InputStream{
         this.pointer = 0;
         this.bufferPointer = 0;
         this.runningExtentPointer = 0;
+        this.isThumbnail = isThumbnail;
+        if (isThumbnail){
+            dataStore = gateway.getThumbnailStoreGateway();
+        } else {
+            dataStore = gateway.getDataStoreGateway();
+        }
+    }
+    public CustomInputStream(Gateway gateway, INode iNode) throws Exception{
+        this(gateway, iNode, false);
     }
 
     @Override
@@ -68,7 +81,7 @@ public class CustomInputStream extends InputStream{
                 runningExtentPointer = 0;
             }
             int bytesRead = 0;
-            bytesRead =  gateway.getDataStoreGateway().populateBufferFromExtent(buffer, nodeEntry.extentFrames.get(currentExtent), bytesPopulated ,runningExtentPointer);
+            bytesRead =  dataStore.populateBufferFromExtent(buffer, nodeEntry.extentFrames.get(currentExtent), bytesPopulated ,runningExtentPointer);
             bytesPopulated += bytesRead;
             runningExtentPointer += bytesRead;
         }

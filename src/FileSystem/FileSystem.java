@@ -173,7 +173,20 @@ public class FileSystem {
         Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
         if (node.isDirectory())
             throw new Exception("Node is a directory");
-        return new CustomInputStream(gateway, node);
+        return new CustomInputStream(gateway, gateway.getINode(node));
+    }
+
+
+    public CustomInputStream openThumbnail(String path) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        INode iNode = gateway.getINode(node);
+        long thumbnailAddress = iNode.getThumbnailStoreAddress();
+        if (thumbnailAddress == -1){
+            return null;
+        }
+        if (node.isDirectory())
+            throw new Exception("Node is a directory");
+        return new CustomInputStream(gateway, gateway.getINode(thumbnailAddress), true);
     }
 
     /**
@@ -182,9 +195,8 @@ public class FileSystem {
      * @param path The path of the required directory
      * @return A Node object containing the directory
      */
-    public Node openDirectory(String path){
-        // IMPLEMENT
-        return null;
+    public Node openDirectory(String path) throws Exception{
+        return dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
     }
 
     /**
