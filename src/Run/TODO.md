@@ -13,3 +13,8 @@
 
 # Future Iterations / Optimizations
 - [ ] Use SQLite to handle all the basic tedious information. It will make the bulk of operations easier and much more efficient.
+
+
+# CURRENT STATUS
+- addFile and CreateDirectory have been given added methods to use parentNode.
+- duplicate file and folders (same name) cannot be created. throw exceptions.

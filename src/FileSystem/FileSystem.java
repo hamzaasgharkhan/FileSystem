@@ -53,7 +53,9 @@ public class FileSystem {
      */
     public static FileSystem mount(File baseFile, String password) throws Exception{
         Crypto.init();
-        return Gateway.mountFileSystem(new FileSystem(), baseFile, password);
+        FileSystem fs =  Gateway.mountFileSystem(new FileSystem(), baseFile, password);
+        fs.gateway.readChildren(fs.dir.getRoot());
+        return fs;
     }
 
     /**
@@ -70,6 +72,12 @@ public class FileSystem {
             throw new IllegalArgumentException("Unable to create directory." + e.getMessage());
         }
     }
+
+    public void createDirectory(Node parentNode, String name) throws Exception{
+        dir.addNode(parentNode, name);
+        __writeDirtyNodes();
+    }
+
     public void ls(String path) throws Exception{
         try {
             LinkedList<Node> nodes = dir.ls(path, gateway.getDirectoryStoreGateway());
@@ -107,7 +115,21 @@ public class FileSystem {
             throw new Exception("File Does Not Exist");
         INode iNode = gateway.addFile(file);
         Node parentNode = dir.getOrCreatePath(parentPath, gateway.getDirectoryStoreGateway());
-        dir.addNode(parentNode, file.name, iNode.getiNodeAddress());
+        Node node = dir.addNode(parentNode, file.name, iNode.getiNodeAddress());
+        if (iNode.getThumbnailStoreAddress() != -1){
+            node.setFlag(Node.HAS_THUMBNAIL_FLAG_MASK, true);
+        }
+        __writeDirtyNodes();
+    }
+
+    public void addFile(Node parentNode, InputFile file) throws Exception{
+        if (file.fileInputStream == null)
+            throw new Exception("File Does Not Exist");
+        INode iNode = gateway.addFile(file);
+        Node node = dir.addNode(parentNode, file.name, iNode.getiNodeAddress());
+        if (iNode.getThumbnailStoreAddress() != -1){
+            node.setFlag(Node.HAS_THUMBNAIL_FLAG_MASK, true);
+        }
         __writeDirtyNodes();
     }
 
@@ -145,7 +167,7 @@ public class FileSystem {
                 gateway.removeDirectory(node);
             } else {
                 for (int i = 0; i < childNodes.size(); i++){
-                    removeDirectory(childNodes.get(0), true);
+                    removeDirectory(childNodes.getFirst(), true);
                 }
                 gateway.removeDirectory(node);
             }
@@ -171,21 +193,28 @@ public class FileSystem {
      */
     public CustomInputStream openFile(String path) throws Exception{
         Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        return openFile(node);
+    }
+
+    public CustomInputStream openFile(Node node) throws Exception{
         if (node.isDirectory())
             throw new Exception("Node is a directory");
         return new CustomInputStream(gateway, gateway.getINode(node));
     }
 
-
     public CustomInputStream openThumbnail(String path) throws Exception{
         Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        return openThumbnail(node);
+    }
+
+    public CustomInputStream openThumbnail(Node node) throws Exception{
+        if (node.isDirectory())
+            throw new Exception("Node is a directory");
         INode iNode = gateway.getINode(node);
         long thumbnailAddress = iNode.getThumbnailStoreAddress();
         if (thumbnailAddress == -1){
             return null;
         }
-        if (node.isDirectory())
-            throw new Exception("Node is a directory");
         return new CustomInputStream(gateway, gateway.getINode(thumbnailAddress), true);
     }
 
@@ -195,8 +224,32 @@ public class FileSystem {
      * @param path The path of the required directory
      * @return A Node object containing the directory
      */
-    public Node openDirectory(String path) throws Exception{
-        return dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+    public LinkedList<Node> openDirectory(String path) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        return openDirectory(node);
+    }
+    public LinkedList<Node> openDirectory(Node node) throws Exception{
+        if (node.isDirectory()){
+            return node.getChildNodes(gateway.getDirectoryStoreGateway());
+        } else {
+            throw new Exception("Node is not a directory");
+        }
+    }
+
+    public Node getNode(String path) throws Exception{
+        Node node =  dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        gateway.readChildren(node);
+        return node;
+    }
+
+    /**
+     * Takes Node. If its CNR flag is On, read the children if not return as it is.
+     * @param node Target Node
+     * @return Provided Node with all the children read.
+     */
+    public Node getNode(Node node) throws Exception{
+        gateway.readChildren(node);
+        return node;
     }
 
     /**
@@ -208,6 +261,12 @@ public class FileSystem {
     public boolean renameFile(String newPath, String existingPath){
         // IMPLEMENT
         return false;
+    }
+
+    public INode getINode(Node node) throws Exception{
+        if (node.isDirectory())
+            return null;
+        return gateway.getINode(node);
     }
 
     /**

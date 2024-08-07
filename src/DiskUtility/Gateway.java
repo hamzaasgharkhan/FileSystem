@@ -169,13 +169,12 @@ public class Gateway {
     public INode addFile(InputFile file) throws Exception{
         long[] extentStoreDetails = extentStoreGateway.addExtentEntry(dataStoreGateway.addNode(file));
         long[] thumbnailExtentStoreDetails = null;
+        long thumbnailStoreAddress = -1;
         if (file.thumbnailInputStream != null){
             thumbnailExtentStoreDetails = extentStoreGateway.addExtentEntry(thumbnailStoreGateway.addNode(file));
+            thumbnailStoreAddress = iNodeStoreGateway.addThumbnailNode(file, thumbnailExtentStoreDetails).getiNodeAddress();
         }
-        // FIX THIS
-//        long thumbnailStoreAddress = thumbnailStoreGateway.addNode(file);
         file.close();
-        long thumbnailStoreAddress = iNodeStoreGateway.addThumbnailNode(file, thumbnailExtentStoreDetails).getiNodeAddress();
         return iNodeStoreGateway.addNode(file, extentStoreDetails, thumbnailStoreAddress);
     }
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -197,6 +196,10 @@ public class Gateway {
         if (!node.checkFlag(Node.DIRECTORY_FLAG_MASK))
             throw new Exception("Node is not a directory.");
         directoryStoreGateway.removeNode(node);
+    }
+
+    public void readChildren(Node node) throws Exception {
+        directoryStoreGateway.readChildren(node);
     }
 
     public INode getINode(Node node) throws Exception{

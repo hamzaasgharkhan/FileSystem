@@ -51,7 +51,7 @@ public class NodeTree {
      * @return  The requested node
      * @throws IllegalArgumentException In case the path is invalid.
      */
-    public Node getNodeFromPath(String path, DirectoryStoreGateway gateway) throws Exception {
+    public Node getNodeFromPath(String path, DirectoryStoreGateway gateway) throws IllegalArgumentException, Exception {
         String[] nodes = path.split("/");
         Node n = root;
         for (int i = 0; i < nodes.length; i++){
@@ -91,7 +91,7 @@ public class NodeTree {
      * with the same name exists
      */
     public Node addNode(String path, String name, long iNodeAddress, DirectoryStoreGateway gateway) throws Exception{
-        _validNodeName(name);
+        __nodeCanBeAdded(path, name, gateway);
         Node parentNode = getNodeFromPath(path, gateway);
         if (!parentNode.isDirectory())
             throw new IllegalArgumentException("Path does not point to a directory");
@@ -105,7 +105,7 @@ public class NodeTree {
     }
 
     public Node addNode(Node parentNode, String name, long iNodeAddress) throws Exception{
-        _validNodeName(name);
+        __nodeCanBeAdded(parentNode, name);
         if (!parentNode.isDirectory())
             throw new IllegalArgumentException("Path does not point to a directory");
         if (parentNode.getChildNode(name) != null)
@@ -120,7 +120,7 @@ public class NodeTree {
 
     // DIRECTORY
     public Node addNode(String path, String name, DirectoryStoreGateway gateway) throws Exception{
-        _validNodeName(name);
+        __nodeCanBeAdded(path, name, gateway);
         Node parentNode = getNodeFromPath(path, gateway);
         Node node = new Node(name, parentNode);
         parentNode.childNodes.add(node);
@@ -130,7 +130,7 @@ public class NodeTree {
 
     // DIRECTORY
     public Node addNode(Node parentNode, String name) throws Exception{
-        _validNodeName(name);
+        __nodeCanBeAdded(parentNode, name);
         Node node = new Node(name, parentNode);
         parentNode.childNodes.add(node);
         dirtyNodes.add(node);
@@ -202,7 +202,6 @@ public class NodeTree {
         if (name.contains("\\") || name.contains("/"))
             return 3;
         return 0;
-
     }
     /**
      * Checks whether a proposed node can be added to the NodeTree. Returns only if the node can be added or throws an
@@ -212,7 +211,37 @@ public class NodeTree {
      */
     public void __nodeCanBeAdded(String path, String name, DirectoryStoreGateway gateway) throws Exception{
         _validNodeName(name);
-        getNodeFromPath(path, gateway);
+        if (__nodeExists(path, name, gateway)){
+            throw new Exception("Unable to Add Node. Node already Exists.");
+        }
+    }
+
+    public void __nodeCanBeAdded(Node parentNode, String name) throws Exception{
+        _validNodeName(name);
+        if (__nodeExists(parentNode, name)){
+            throw new Exception("Unable to Add Node. Node already Exists.");
+        }
+    }
+
+    public boolean __nodeExists(String path, String name, DirectoryStoreGateway gateway) throws Exception{
+        Node parentNode;
+        try {
+            parentNode = getNodeFromPath(path, gateway);
+        } catch (IllegalArgumentException e){
+            return false;
+        } catch (Exception e){
+            throw new Exception("Unable To Get Node: " + e.getMessage());
+        }
+        return __nodeExists(parentNode, name);
+    }
+
+    public boolean __nodeExists(Node parentNode, String name){
+        for (Node node: parentNode.childNodes){
+            if (node.getName().equals(name)){
+                return true;
+            }
+        }
+        return false;
     }
 
     public void setRoot(Node root) {

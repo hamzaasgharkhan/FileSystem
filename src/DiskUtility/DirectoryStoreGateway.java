@@ -327,6 +327,8 @@ public class DirectoryStoreGateway{
         DirectoryFrame frame = getDirectoryFrame(node.getIndex());
         if (frame.childIndex == frame.index)
             return;
+        if (!node.isDirectory())
+            return;
         // Get the directory frame of a child.
         DirectoryFrame childFrame = getDirectoryFrame(frame.childIndex);
         DirectoryFrame runningChildFrame = childFrame;

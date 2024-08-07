@@ -13,6 +13,7 @@ import java.util.Optional;
 public class Node {
     public static final byte CNR_FLAG_MASK = 0b00000001;
     public static final byte DIRECTORY_FLAG_MASK = (byte)0b10000000;
+    public static final byte HAS_THUMBNAIL_FLAG_MASK = (byte) 0b00000010;
     /**
      * Contains the name of the Node. Maximum 256 bytes.
      */
@@ -73,6 +74,8 @@ public class Node {
     public boolean isDirectory(){
         return checkFlag(FLAGS.DEFAULT_NODE_DIRECTORY);
     }
+    public boolean childrenNotRead() {return checkFlag(CNR_FLAG_MASK);}
+    public boolean hasThumbnail(){return checkFlag(HAS_THUMBNAIL_FLAG_MASK);}
 
     /**
      * This method returns the path of a given node by traversing the tree through its parent till it reaches
@@ -122,6 +125,7 @@ public class Node {
     public void addChild(Node child){
         if (!isDirectory())
             throw new RuntimeException("Cannot Add Child. Parent Node is not a directory.");
+        childNodes.removeIf(node -> node.name.equals(child.name));
         childNodes.add(child);
         child.parentNode = this;
     }
@@ -145,6 +149,10 @@ public class Node {
     public LinkedList<Node> getChildNodes(DirectoryStoreGateway gateway) throws Exception{
         if (checkFlag(CNR_FLAG_MASK))
             gateway.readChildren(this);
+        return this.childNodes;
+    }
+
+    public LinkedList<Node> getChildNodes(){
         return this.childNodes;
     }
 
