@@ -163,4 +163,8 @@ public class Node {
     public void setIndex(long index) {
         this.index = index;
     }
+
+    public void setFlags(byte flags) {
+        this.flags = flags;
+    }
 }

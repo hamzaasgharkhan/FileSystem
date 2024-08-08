@@ -202,6 +202,35 @@ public class Gateway {
         directoryStoreGateway.removeNode(node);
     }
 
+    public INode copyNode(Node node, Node targetNode) throws Exception{
+        InputFile file;
+        INode iNode = iNodeStoreGateway.getINode(node.getiNodeAddress());
+        if (iNode.getThumbnailStoreAddress() == -1){
+            // No Thumbnail
+            file = new InputFile(
+                    node.getName(),
+                    targetNode.getPath(),
+                    iNode.getiNodeSize(),
+                    iNode.getCreationTime(),
+                    iNode.getLastModifiedTime(),
+                    new CustomInputStream(this, iNode));
+        } else {
+            INode thumbnailINode = iNodeStoreGateway.getINode(iNode.getThumbnailStoreAddress());
+            file = new InputFile(
+                    node.getName(),
+                    targetNode.getPath(),
+                    iNode.getiNodeSize(),
+                    iNode.getCreationTime(),
+                    iNode.getLastModifiedTime(),
+                    new CustomInputStream(this, iNode),
+                    new CustomInputStream(this, thumbnailINode),
+                    thumbnailINode.getiNodeSize());
+        }
+        return addFile(file);
+    }
+
+
+
     public void readChildren(Node node) throws Exception {
         directoryStoreGateway.readChildren(node);
     }

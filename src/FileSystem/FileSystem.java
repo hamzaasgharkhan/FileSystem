@@ -276,7 +276,53 @@ public class FileSystem {
         return true;
     }
 
+    public boolean moveNode(String path, String targetPath) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        Node targetNode = dir.getNodeFromPath(targetPath, gateway.getDirectoryStoreGateway());
+        return moveNode(node, targetNode);
+    }
 
+    public boolean moveNode(Node node, Node targetNode) throws Exception{
+        if (!targetNode.isDirectory()){
+            throw new Exception("TargetNode is not a directory.");
+        }
+        Node currentParentNode = node.getParentNode();
+        currentParentNode.childNodes.remove(node);
+        targetNode.childNodes.add(node);
+        node.parentNode = targetNode;
+        dir.getDirtyNodes().add(node);
+        __writeDirtyNodes();
+        return true;
+    }
+
+    public boolean copyNode(String path, String targetPath) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        Node targetNode = dir.getNodeFromPath(targetPath, gateway.getDirectoryStoreGateway());
+        return copyNode(node, targetNode);
+    }
+
+    public boolean copyNode(Node node, Node targetNode) throws Exception{
+        if (node.isDirectory()){
+            throw new Exception("Copy can only be called on files (not on directories)");
+        }
+        if (!targetNode.isDirectory()){
+            throw new Exception("TargetNode is not a directory.");
+        }
+        if (dir.__nodeExists(targetNode, node.getName())){
+            throw new Exception("Node by the name already exists in the target location");
+        }
+        INode newINode = gateway.copyNode(node, targetNode);
+        Node newNode = new Node(
+                node.getName(),
+                targetNode,
+                newINode.getiNodeAddress()
+        );
+        newNode.setFlags(node.getFlags());
+        targetNode.childNodes.add(newNode);
+        dir.getDirtyNodes().add(newNode);
+        __writeDirtyNodes();
+        return true;
+    }
 
     public INode getINode(Node node) throws Exception{
         if (node.isDirectory())

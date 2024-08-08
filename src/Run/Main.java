@@ -66,7 +66,9 @@ public class Main {
             );
 //            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
             fs = FileSystem.mount(mountPath, "kratos123");
-            fs.createDirectory("/", "sheep");
+//            fs.moveNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "/");
+//            fs.copyNode("/1.png", "/home");
+//            fs.createDirectory("/", "sheep");
 //            fs.renameNode("/sheep", "sheep123");
 //            fs.createDirectory("/","Obama1");
 //            fs.createDirectory("/","Iqbal");
