@@ -152,8 +152,12 @@ public class Gateway {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //  Adding nodes to directory store
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public long addNode(Node node) throws Exception{
-        return directoryStoreGateway.addNode(node);
+    public long writeNode(Node node) throws Exception{
+        if (node.getIndex() == -1L){
+            return directoryStoreGateway.addNode(node);
+        } else {
+            return directoryStoreGateway.updateNode(node);
+        }
     }
 
     public DirectoryStoreGateway getDirectoryStoreGateway() {

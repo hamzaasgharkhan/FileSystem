@@ -39,7 +39,7 @@ public class FileSystem {
         try{
             fs.gateway = new Gateway(fileSystemBaseFile, superBlock, password, true);
             fs.dir = new NodeTree();
-            fs.gateway.addNode(fs.dir.getDirtyNodes().pop());
+            fs.__writeDirtyNodes();
         } catch (Exception e){
             throw new Exception("FileSystem Creation Failed.\n" + e.getMessage());
         }
@@ -253,15 +253,30 @@ public class FileSystem {
     }
 
     /**
-     * This method renames a file.
-     * @param newPath The new path of the file (inclusive of the file name)
-     * @param existingPath The existing path of the file (inclusive of the file name)
+     * This method renames a node.
+     * @param path The path of the node
+     * @param name The desired name for the node
      * @return true if and only if the operation is successful
      */
-    public boolean renameFile(String newPath, String existingPath){
-        // IMPLEMENT
-        return false;
+    public boolean renameNode(String path, String name) throws Exception{
+        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        return renameNode(node, name);
     }
+
+    public boolean renameNode(Node node, String name) throws Exception{
+        if (node == dir.getRoot())
+            throw new Exception("Cannot Rename Root");
+        Node parentNode = node.parentNode;
+        if (dir.__nodeExists(parentNode, name)){
+            throw new Exception("Node by the name: "+ name +" already exists");
+        }
+        node.setName(name);
+        dir.getDirtyNodes().add(node);
+        __writeDirtyNodes();
+        return true;
+    }
+
+
 
     public INode getINode(Node node) throws Exception{
         if (node.isDirectory())
@@ -326,7 +341,7 @@ public class FileSystem {
     private void __writeDirtyNodes() throws Exception{
         LinkedList<Node> dirtyNodes = dir.getDirtyNodes();
         while (!dirtyNodes.isEmpty())
-            gateway.addNode(dirtyNodes.pop());
+            gateway.writeNode(dirtyNodes.pop());
     }
 
     private void __lsChildren(Node node, int level) throws Exception{

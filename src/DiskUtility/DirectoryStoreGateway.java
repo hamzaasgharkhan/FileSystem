@@ -110,6 +110,7 @@ public class DirectoryStoreGateway{
         NodeTree nodeTree = new NodeTree(true);
         DirectoryFrame rootFrame = getDirectoryFrame(0);
         Node root = new Node(rootFrame.name, null, 0, rootFrame.flags);
+        root.setIndex(0);
         nodeTree.setRoot(root);
         root.setFlag(Node.CNR_FLAG_MASK, true);
         // Check to see whether root has any children. If not, simply return the root after setting CNR flag to false.
@@ -118,26 +119,7 @@ public class DirectoryStoreGateway{
             return nodeTree;
         }
         // Get the directory frame of a child.
-        DirectoryFrame childFrame = getDirectoryFrame(rootFrame.childIndex);
-        DirectoryFrame runningChildFrame = childFrame;
-        if (childFrame.hasSiblings()){
-            do {
-                Node childNode = new Node(runningChildFrame.name,  root, runningChildFrame.iNodeAddress, runningChildFrame.flags);
-                childNode.setIndex(runningChildFrame.index);
-                if (childNode.isDirectory())
-                    childNode.setFlag(Node.CNR_FLAG_MASK, true);
-                root.addChild(childNode);
-                runningChildFrame = getDirectoryFrame(runningChildFrame.nextSiblingIndex);
-            } while (runningChildFrame.index != childFrame.index);
-        } else {
-            Node childNode = new Node(runningChildFrame.name, root, runningChildFrame.iNodeAddress, runningChildFrame.flags);
-            childNode.setIndex(runningChildFrame.index);
-            if (childNode.isDirectory())
-                childNode.setFlag(Node.CNR_FLAG_MASK, true);
-            root.addChild(childNode);
-        }
-        // Set the CNR flag of root to false after all its children have been read.
-        root.setFlag(Node.CNR_FLAG_MASK, false);
+        readChildren(root);
         return nodeTree;
     }
     private DirectoryFrame getDirectoryFrame(long index) throws Exception{
@@ -237,6 +219,126 @@ public class DirectoryStoreGateway{
         node.setIndex(index);
         return index;
     }
+
+    /**
+     * This method updates a Node already present in the directory store
+     * @param node Target Node
+     * @return Index of the node.
+     */
+    public long updateNode(Node node) throws Exception{
+        long index = node.getIndex();
+        DirectoryFrame frame = getDirectoryFrame(index);
+        Node parentNode = node.getParentNode();
+        boolean nameChanged, parentChanged, flagsChanged;
+        /*
+         * Cases:
+         *  1. Name Changed:
+         *      Only change the name and return.
+         *  2. Parent Changed:
+         *      Change the child index of the previous parent, possibly the new parent. Change the sibling index of the past siblings. New possibly.
+         *  3. Flags Changed:
+         *      Write Flags.
+         */
+        // CASE 1: Name Changed.
+        nameChanged = !node.getName().equals(frame.name);
+        // CASE 2: Parent Changed.
+        if (parentNode != null){
+            // Only handling this case as the parent of Root can never be changed.
+            parentChanged = parentNode.getIndex() != frame.parentIndex;
+        } else {
+            // If root, parentChanged is false.
+            parentChanged = false;
+        }
+        // CASE 3: Flags Changed.
+        flagsChanged = node.getFlags() != frame.flags;
+        ///////////////////////////////////////////
+        // HANDLE ALL THE CHANGES ONE BY ONE.
+        ///////////////////////////////////////////
+        // CASE 1: NAME CHANGED.
+        if (nameChanged){
+            frame.name = node.getName();
+        }
+        // CASE 2: PARENT CHANGED.
+        if (parentChanged){
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            ///////// PREVIOUS CONNECTIONS
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // First Take Care of All the changes needed to the previous parent and possibly siblings.
+            DirectoryFrame previousParentFrame = getDirectoryFrame(frame.parentIndex);
+            // Take Care of previous parent's childIndex.
+            if (previousParentFrame.childIndex == index){
+                // Node is set as the ChildIndex of the previous parent.
+                // In case there are more siblings, set the index to one of them else set it to the parent's own index.
+                if (frame.previousSiblingIndex != frame.index){
+                    // It had a sibling, hence assign the sibling as the new child.
+                    previousParentFrame.childIndex = frame.previousSiblingIndex;
+                } else {
+                    previousParentFrame.childIndex = previousParentFrame.index;
+                }
+                __writeDirectoryFrame(previousParentFrame, previousParentFrame.index);
+            }
+            // Take care of previous siblings, if any.
+            if (frame.previousSiblingIndex != frame.index){
+                DirectoryFrame previousSiblingFrame;
+                // At least one sibling exists.
+                previousSiblingFrame = getDirectoryFrame(frame.previousSiblingIndex);
+                if (frame.previousSiblingIndex != frame.nextSiblingIndex){
+                    DirectoryFrame nextSiblingFrame = getDirectoryFrame(frame.nextSiblingIndex);
+                    // At least two siblings exist.
+                    previousSiblingFrame.nextSiblingIndex = nextSiblingFrame.index;
+                    nextSiblingFrame.previousSiblingIndex = previousSiblingFrame.index;
+                    __writeDirectoryFrame(nextSiblingFrame, nextSiblingFrame.index);
+                } else {
+                    // Only 1 sibling.
+                    previousSiblingFrame.previousSiblingIndex = previousSiblingFrame.index;
+                    previousSiblingFrame.nextSiblingIndex = previousSiblingFrame.index;
+                }
+                __writeDirectoryFrame(previousSiblingFrame, previousSiblingFrame.index);
+            }
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //////// NEW CONNECTION
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // Turn for next parent.
+            DirectoryFrame nextParentFrame = getDirectoryFrame(parentNode.getIndex());
+            if (nextParentFrame.childIndex == nextParentFrame.index){
+                // Next Parent Currently has no children.
+                nextParentFrame.childIndex = frame.index;
+                frame.nextSiblingIndex = frame.index;
+                frame.previousSiblingIndex = frame.index;
+                __writeDirectoryFrame(nextParentFrame, nextParentFrame.index);
+            } else {
+                // There is at least 1 child already.
+                DirectoryFrame nextParentChildFrame = getDirectoryFrame(nextParentFrame.childIndex);
+                if (nextParentChildFrame.previousSiblingIndex == nextParentChildFrame.index){
+                    // The child does not have any siblings.
+                    nextParentChildFrame.nextSiblingIndex = frame.index;
+                    nextParentChildFrame.previousSiblingIndex = frame.index;
+                    frame.nextSiblingIndex = nextParentChildFrame.index;
+                    frame.previousSiblingIndex = nextParentChildFrame.index;
+                } else {
+                    // The child does have at least one sibling already.
+                    DirectoryFrame nextParentChildSiblingFrame = getDirectoryFrame(nextParentChildFrame.previousSiblingIndex);
+                    nextParentChildSiblingFrame.nextSiblingIndex = frame.index;
+                    frame.previousSiblingIndex = nextParentChildSiblingFrame.index;
+                    frame.nextSiblingIndex = nextParentChildFrame.index;
+                    nextParentChildFrame.previousSiblingIndex = frame.index;
+                    __writeDirectoryFrame(nextParentChildSiblingFrame, nextParentChildSiblingFrame.index);
+                }
+                __writeDirectoryFrame(nextParentChildFrame, nextParentChildFrame.index);
+            }
+        }
+        // CASE 3: FLAGS CHANGED
+        if (flagsChanged){
+            frame.flags = node.getFlags();
+        }
+        if (nameChanged || parentChanged || flagsChanged){
+            __writeDirectoryFrame(frame, index);
+        }
+        return index;
+    }
+
+
+
     /**
      * This method takes a node and removes the node from the FileSystem
      * @param node Target Node

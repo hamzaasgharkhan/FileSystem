@@ -66,7 +66,8 @@ public class Main {
             );
 //            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
             fs = FileSystem.mount(mountPath, "kratos123");
-//            fs.createDirectory("/", "sheep");
+            fs.createDirectory("/", "sheep");
+//            fs.renameNode("/sheep", "sheep123");
 //            fs.createDirectory("/","Obama1");
 //            fs.createDirectory("/","Iqbal");
 //            fs.createDirectory("/Iqbal","Iqbal2");
@@ -86,7 +87,7 @@ public class Main {
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file2.jpg", "output2.jpg");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file3.jpg", "output3.jpg");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/file4.jpg", "output4.jpg");
-            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
+//            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.mp4", "output6.mp4");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/large.mp4", "outputLarge.mp4");
 //            fs.removeDirectory("/Obama1", true);

@@ -45,7 +45,7 @@
     nextSiblingIndex            -       8 bytes                                 || Starting Index: 28
     childIndex                  -       8 bytes                                 || Starting Index: 36
     iNode                       -       8 bytes                                 || Starting Index: 44
-    parentINode                 -       8 bytes                                 || Starting Index: 52
+    parentINode                 -       8 bytes                                 || Starting Index: 52       // DELETE IN FUTURE AS PARENT CANNOT HAVE INODE ADDRESS.
     flags                       -       1 byte                                  || Starting Index: 60
     Magic Value                 -       4 bytes                                 || Starting Index: 61
     name                        -       256 bytes                               || Starting Index: 65

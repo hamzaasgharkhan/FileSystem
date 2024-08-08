@@ -37,7 +37,7 @@ public class Node {
     /**
      * The index of the node within the file system.
      */
-    long index;
+    long index = -1;
 
 
     /**
@@ -130,6 +130,8 @@ public class Node {
         child.parentNode = this;
     }
 
+    protected void setName(String name) {this.name = name;}
+
     public String getName(){
         return name;
     }
@@ -145,6 +147,8 @@ public class Node {
     public long getiNodeAddress(){
         return iNodeAddress;
     }
+
+    public byte getFlags(){return this.flags;}
 
     public LinkedList<Node> getChildNodes(DirectoryStoreGateway gateway) throws Exception{
         if (checkFlag(CNR_FLAG_MASK))
