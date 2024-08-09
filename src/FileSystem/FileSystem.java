@@ -156,7 +156,7 @@ public class FileSystem {
         removeDirectory(node, false);
     }
 
-    private void removeDirectory(Node node, boolean recursive) throws Exception{
+    public void removeDirectory(Node node, boolean recursive) throws Exception{
         LinkedList<Node> childNodes;
         if (!recursive){
             gateway.removeDirectory(node);
@@ -181,6 +181,10 @@ public class FileSystem {
      */
     public void removeNode(String path) throws Exception{
         Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+        removeNode(node);
+    }
+
+    public void removeNode(Node node) throws Exception{
         if (node.isDirectory())
             throw new Exception("Node is a directory.");
         gateway.removeNode(node);

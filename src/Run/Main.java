@@ -24,6 +24,7 @@ public class Main {
             Path path5 = Paths.get("1.png");
             Path path6 = Paths.get("1.mp4");
             Path largePath = Paths.get("large.mp4");
+            Path pdfPath = Paths.get("cv.pdf");
             if (!path1.toFile().exists()) {
                 throw new Exception("NO SUCH FILE.");
             }
@@ -45,6 +46,10 @@ public class Main {
             if (!largePath.toFile().exists()) {
                 throw new Exception("NO SUCH FILE.");
             }
+            if (!pdfPath.toFile().exists()) {
+                throw new Exception("NO SUCH FILE.");
+            }
+
             long fileCreationTime, fileLastModifiedTime, fileSize;
             try {
                 BasicFileAttributes attributes = Files.readAttributes(path5, BasicFileAttributes.class);
@@ -54,22 +59,17 @@ public class Main {
             } catch (IOException e){
                 throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
             }
-            InputFile file5 = new InputFile(
-                    path5.getFileName().toString(),
-                    parentPath.toAbsolutePath().toString(),
-                    fileSize,
-                    fileCreationTime,
-                    fileLastModifiedTime,
-                    new FileInputStream(path5.toFile()),
-                    new FileInputStream("testThumbnail.jpg"),
-                    new File("testThumbnail.jpg").length()
-            );
-//            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
-            fs = FileSystem.mount(mountPath, "kratos123");
-            fs.moveNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "/");
-            fs.copyNode("/1.png", "/home");
-            writeFileToDisk(fs, "/1.png", "moved-1.png");
-            writeFileToDisk(fs, "/home/1.png", "copied-1.png");
+            InputFile file5 = getInputFile(path5, Path.of("testThumbnail.jpg"));
+            InputFile pdf = getInputFile(pdfPath);
+            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
+//            fs = FileSystem.mount(mountPath, "kratos123");
+            fs.addFile(pdf);
+            fs.moveNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/cv.pdf", "/");
+//            fs.copyNode("/1.png", "/home");
+//            writeFileToDisk(fs, "/cv.pdf", "cv.pdf");
+            fs.removeNode("/cv.pdf");
+//            writeFileToDisk(fs, "/1.png", "moved-1.png");
+//            writeFileToDisk(fs, "/home/1.png", "copied-1.png");
 //            fs.createDirectory("/", "sheep");
 //            fs.renameNode("/sheep", "sheep123");
 //            fs.createDirectory("/","Obama1");
@@ -103,6 +103,52 @@ public class Main {
             throw new RuntimeException(ex);
         }
     }
+
+    public static InputFile getInputFile(Path path, Path thumbnailPath) throws Exception{
+        Path parentPath = Paths.get("");
+        long fileCreationTime, fileLastModifiedTime, fileSize;
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class);
+            fileCreationTime = attributes.creationTime().toMillis();
+            fileLastModifiedTime = attributes.lastModifiedTime().toMillis();
+            fileSize = attributes.size();
+        } catch (IOException e){
+            throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
+        }
+        return new InputFile(
+                path.getFileName().toString(),
+                parentPath.toAbsolutePath().toString(),
+                fileSize,
+                fileCreationTime,
+                fileLastModifiedTime,
+                new FileInputStream(path.toFile()),
+                new FileInputStream(thumbnailPath.toFile()),
+                thumbnailPath.toFile().length()
+        );
+    }
+
+    public static InputFile getInputFile(Path path) throws Exception{
+        Path parentPath = Paths.get("");
+        long fileCreationTime, fileLastModifiedTime, fileSize;
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class);
+            fileCreationTime = attributes.creationTime().toMillis();
+            fileLastModifiedTime = attributes.lastModifiedTime().toMillis();
+            fileSize = attributes.size();
+        } catch (IOException e){
+            throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
+        }
+        return new InputFile(
+                path.getFileName().toString(),
+                parentPath.toAbsolutePath().toString(),
+                fileSize,
+                fileCreationTime,
+                fileLastModifiedTime,
+                new FileInputStream(path.toFile())
+        );
+    }
+
+
     public static void writeFileToDisk(FileSystem fs, String path, String outputName) throws Exception{
         CustomInputStream fin = fs.openFile(path);
         FileOutputStream fout = new FileOutputStream(outputName);
@@ -114,6 +160,7 @@ public class Main {
         fin.close();
         fout.close();
         CustomInputStream thumbnail = fs.openThumbnail(path);
+        if (thumbnail == null) return;
         fout = new FileOutputStream("thumbnail-" + outputName.split("\\.")[0] + ".jpg");
         len = 0;
         buffer = new byte[4096];

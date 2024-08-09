@@ -187,12 +187,14 @@ public class Gateway {
     public void removeNode(Node node) throws Exception{
         NodeEntry nodeEntry = __getNodeDetails(node);
         dataStoreGateway.removeNode(nodeEntry.extentFrames);
-        thumbnailStoreGateway.removeNode(nodeEntry.thumbnailExtentFrames);
         // FIX THIS
         extentStoreGateway.removeExtentEntry(nodeEntry.extentFrames);
-        extentStoreGateway.removeExtentEntry(nodeEntry.thumbnailExtentFrames);
         iNodeStoreGateway.removeINode(nodeEntry.iNode.getiNodeAddress());
-        iNodeStoreGateway.removeINode(nodeEntry.iNode.getThumbnailStoreAddress());
+        if (nodeEntry.thumbnailExtentFrames != null){
+            thumbnailStoreGateway.removeNode(nodeEntry.thumbnailExtentFrames);
+            extentStoreGateway.removeExtentEntry(nodeEntry.thumbnailExtentFrames);
+            iNodeStoreGateway.removeINode(nodeEntry.iNode.getThumbnailStoreAddress());
+        }
         directoryStoreGateway.removeNode(node);
     }
 
