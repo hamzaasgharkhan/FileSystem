@@ -64,6 +64,7 @@ public class INodeStoreGateway {
     public long writeINode(INode iNode) throws Exception{
         RandomAccessFile fin;
         long iNodeAddress = bitMapUtility.getFreeIndex(Store.INodeStore);
+        iNode.setiNodeAddress(iNodeAddress);
         try {
             fin = new RandomAccessFile(iNodeFile, "rw");
         } catch (FileNotFoundException e){
@@ -86,8 +87,7 @@ public class INodeStoreGateway {
         } catch (IOException e){
             throw new Exception("Unable to close INODE_STORE file." + e.getMessage());
         }
-        bitMapUtility.setIndexINodeStore(iNodeAddress, true);
-        iNode.setiNodeAddress(iNodeAddress);
+        bitMapUtility.setIndex(Store.INodeStore, iNodeAddress, true);
         return iNodeAddress;
     }
 

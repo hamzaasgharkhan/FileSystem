@@ -64,10 +64,12 @@ public class Main {
                     new FileInputStream("testThumbnail.jpg"),
                     new File("testThumbnail.jpg").length()
             );
-//            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
-            fs = FileSystem.mount(mountPath, "kratos123");
+            fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
+//            fs = FileSystem.mount(mountPath, "kratos123");
 //            fs.moveNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "/");
 //            fs.copyNode("/1.png", "/home");
+//            writeFileToDisk(fs, "/1.png", "moved-1.png");
+//            writeFileToDisk(fs, "/home/1.png", "copied-1.png");
 //            fs.createDirectory("/", "sheep");
 //            fs.renameNode("/sheep", "sheep123");
 //            fs.createDirectory("/","Obama1");
@@ -112,7 +114,7 @@ public class Main {
         fin.close();
         fout.close();
         CustomInputStream thumbnail = fs.openThumbnail(path);
-        fout = new FileOutputStream("thumbnail.jpg");
+        fout = new FileOutputStream("thumbnail-" + outputName.split("\\.")[0] + ".jpg");
         len = 0;
         buffer = new byte[4096];
         while ((len = thumbnail.read(buffer)) != -1) {

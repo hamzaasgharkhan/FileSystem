@@ -129,9 +129,8 @@ class ExtentStoreGateway {
         long firstIndex = 0, index = 0, nextIndex = 0;
         int extentFramesSize = extentFrames.size();
         if (extentFramesSize == 1){
-            firstIndex = index = bitMapUtility.getFreeIndexExtentStore();
-            nextIndex = index;
-            __addExtentEntry(byteArray, extentFrames.get(0), nextIndex);
+            firstIndex = index = nextIndex = bitMapUtility.getFreeIndexExtentStore();
+            __addExtentEntry(byteArray, extentFrames.getFirst(), nextIndex);
             __writeExtentFrameToFile(file, byteArray, index);
             bitMapUtility.setIndexExtentStore(index, true);
         } else {
