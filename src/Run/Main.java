@@ -49,25 +49,20 @@ public class Main {
             if (!pdfPath.toFile().exists()) {
                 throw new Exception("NO SUCH FILE.");
             }
-
-            long fileCreationTime, fileLastModifiedTime, fileSize;
-            try {
-                BasicFileAttributes attributes = Files.readAttributes(path5, BasicFileAttributes.class);
-                fileCreationTime = attributes.creationTime().toMillis();
-                fileLastModifiedTime = attributes.lastModifiedTime().toMillis();
-                fileSize = attributes.size();
-            } catch (IOException e){
-                throw new Exception("Unable to access the attributes of the requested file." + e.getMessage());
-            }
             InputFile file5 = getInputFile(path5, Path.of("testThumbnail.jpg"));
             InputFile pdf = getInputFile(pdfPath);
             fs = FileSystem.createFileSystem(createPath, "Aqua", "kratos123");
 //            fs = FileSystem.mount(mountPath, "kratos123");
             fs.addFile(pdf);
-            fs.moveNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/cv.pdf", "/");
+            fs.moveNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/cv.pdf", "/home");
+            fs.removeNode("/home/cv.pdf");
+            fs.addFile(file5);
+            fs.moveNode("/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "/home");
+            fs.removeNode("/home/1.png");
+            fs.addFile(getInputFile(path5, Path.of("testThumbnail.jpg")));
 //            fs.copyNode("/1.png", "/home");
 //            writeFileToDisk(fs, "/cv.pdf", "cv.pdf");
-            fs.removeNode("/cv.pdf");
+//            fs.removeNode("/home", true);
 //            writeFileToDisk(fs, "/1.png", "moved-1.png");
 //            writeFileToDisk(fs, "/home/1.png", "copied-1.png");
 //            fs.createDirectory("/", "sheep");
@@ -94,7 +89,7 @@ public class Main {
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.png", "output5.png");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/1.mp4", "output6.mp4");
 //            writeFileToDisk(fs, "/home/reikhan/Desktop/Files/FYP/Project/FYP/large.mp4", "outputLarge.mp4");
-//            fs.removeDirectory("/Obama1", true);
+//            fs.removeNode("/Obama1", true);
 //            fs.ls("/");
 //            fs.ls("/");
             fs.printTree();

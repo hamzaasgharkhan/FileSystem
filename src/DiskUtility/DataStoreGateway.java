@@ -367,7 +367,7 @@ class DataStoreGateway {
                 short newBytesOccupied = (short)(DataBlock.getBytesOccupied(dataBlock) - extentFrame.length);
                 DataBlock.setBytesOccupied(dataBlock, newBytesOccupied);
                 __updateDataBlockFile(dataBlock, startBlockIndex);
-                bitMapUtility.setIndexDataStore(startBlockIndex, newBytesOccupied);
+                bitMapUtility.setIndex(store, startBlockIndex, newBytesOccupied);
             } else {
                 // The extent spans multiple blocks
                 // FIRST: Delete everything in the first block from the offset to the end
@@ -376,14 +376,14 @@ class DataStoreGateway {
                 short newBytesOccupied = (short)(DataBlock.getBytesOccupied(dataBlock) - length);
                 DataBlock.setBytesOccupied(dataBlock, newBytesOccupied);
                 __updateDataBlockFile(dataBlock, startBlockIndex);
-                bitMapUtility.setIndexDataStore(startBlockIndex, newBytesOccupied);
+                bitMapUtility.setIndex(store, startBlockIndex, newBytesOccupied);
                 for (long i = startBlockIndex + 1; i < endBlockIndex; i++){
                     // SECOND: Clear all the blocks in between
                     __updateDataBlockArray(dataBlock, i);
                     DataBlock.setRunOccupied(dataBlock, 0, DATA_STORE_BLOCK_FRAME.DATA_SIZE, false);
                     DataBlock.setBytesOccupied(dataBlock, (short)0);
                     __updateDataBlockFile(dataBlock, i);
-                    bitMapUtility.setIndexDataStore(i, (short)0);
+                    bitMapUtility.setIndex(store, i, (short)0);
                 }
                 // THIRD: Clear the last block till the End Offset
                 __updateDataBlockArray(dataBlock, endBlockIndex);
@@ -392,7 +392,7 @@ class DataStoreGateway {
                 newBytesOccupied = (short)(DataBlock.getBytesOccupied(dataBlock) - length);
                 DataBlock.setBytesOccupied(dataBlock, newBytesOccupied);
                 __updateDataBlockFile(dataBlock, endBlockIndex);
-                bitMapUtility.setIndexDataStore(endBlockIndex, newBytesOccupied);
+                bitMapUtility.setIndex(store, endBlockIndex, newBytesOccupied);
             }
         }
     }

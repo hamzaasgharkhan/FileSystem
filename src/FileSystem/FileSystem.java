@@ -7,6 +7,7 @@ import DiskUtility.Gateway;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.LinkedList;
 
 /**
@@ -141,35 +142,31 @@ public class FileSystem {
      *                  an exception is thrown.
      * @throws Exception In case the path does not exist, or the directory is not empty and recursive is not set to true.
      */
-    public void removeDirectory(String path, boolean recursive) throws Exception{
+    public void removeNode(String path, boolean recursive) throws Exception{
         Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
-        removeDirectory(node, recursive);
+        removeNode(node, recursive);
     }
 
-    /**
-     * Calls the removeDirectory method with recursive flag set to false
-     * @param path Path of the directory
-     * @throws Exception In case the Directory is not empty or other IOException occurs.
-     */
-    public void removeDirectory(String path) throws Exception{
-        Node node = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
-        removeDirectory(node, false);
-    }
 
-    public void removeDirectory(Node node, boolean recursive) throws Exception{
+    public void removeNode(Node node, boolean recursive) throws Exception{
         LinkedList<Node> childNodes;
-        if (!recursive){
-            gateway.removeDirectory(node);
+        if (!node.isDirectory()){
+            // Node is a file.
+            gateway.removeNode(node);
         } else {
-            if (!node.isDirectory()){
-                gateway.removeNode(node);
-            } else if ((childNodes = node.getChildNodes(gateway.getDirectoryStoreGateway())).isEmpty()){
+            childNodes = openDirectory(node);
+            if (childNodes.isEmpty()){
                 gateway.removeDirectory(node);
             } else {
-                for (int i = 0; i < childNodes.size(); i++){
-                    removeDirectory(childNodes.getFirst(), true);
+                if (!recursive){
+                    throw new Exception("Cannot Delete Non Empty Directory Without Recursive Call.");
+                } else {
+                    LinkedList<Node> childNodesCopy = new LinkedList<Node>(childNodes);
+                    for (Node childNode: childNodesCopy){
+                        removeNode(childNode, true);
+                    }
+                    removeNode(node, true);
                 }
-                gateway.removeDirectory(node);
             }
         }
     }
@@ -185,9 +182,7 @@ public class FileSystem {
     }
 
     public void removeNode(Node node) throws Exception{
-        if (node.isDirectory())
-            throw new Exception("Node is a directory.");
-        gateway.removeNode(node);
+        removeNode(node, false);
     }
 
     /**
