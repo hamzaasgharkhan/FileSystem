@@ -65,18 +65,19 @@ public class FileSystem {
      * @param path The path of the new directory (exclusive of the new node)
      * @param name Name of the desired directory
      */
-    public void createDirectory(String path, String name) throws Exception{
+    public Node createDirectory(String path, String name) throws Exception{
         try {
-            dir.addNode(path, name, gateway.getDirectoryStoreGateway());
-            __writeDirtyNodes();
+            Node parentNode = dir.getNodeFromPath(path, gateway.getDirectoryStoreGateway());
+            return createDirectory(parentNode, name);
         } catch (IllegalArgumentException e){
             throw new IllegalArgumentException("Unable to create directory." + e.getMessage());
         }
     }
 
-    public void createDirectory(Node parentNode, String name) throws Exception{
-        dir.addNode(parentNode, name);
+    public Node createDirectory(Node parentNode, String name) throws Exception{
+        Node node = dir.addNode(parentNode, name);
         __writeDirtyNodes();
+        return node;
     }
 
     public void ls(String path) throws Exception{
@@ -304,41 +305,48 @@ public class FileSystem {
     }
 
     public boolean copyNode(Node node, Node targetNode) throws Exception{
-        if (node.isDirectory()){
-            throw new Exception("Copy can only be called on files (not on directories)");
-        }
         if (!targetNode.isDirectory()){
             throw new Exception("TargetNode is not a directory.");
         }
         if (dir.__nodeExists(targetNode, node.getName())){
             throw new Exception("Node by the name already exists in the target location");
         }
-        InputFile file;
-        INode iNode = gateway.getINode(node.getiNodeAddress());
-        CustomInputStream fileInputStream = new CustomInputStream(gateway, iNode);
-        if (iNode.getThumbnailStoreAddress() == -1){
-            // No Thumbnail
-            file = new InputFile(
-                    node.getName(),
-                    targetNode.getPath(),
-                    iNode.getiNodeSize(),
-                    iNode.getCreationTime(),
-                    iNode.getLastModifiedTime(),
-                    fileInputStream);
+        if (node.isDirectory()){
+            // Node is a directory.
+            Node newNode = createDirectory(targetNode, node.getName());
+            LinkedList<Node> childNodes = openDirectory(node);
+            for (Node childNode: childNodes){
+                copyNode(childNode, newNode);
+            }
         } else {
-            INode thumbnailINode = gateway.getINode(iNode.getThumbnailStoreAddress());
-            CustomInputStream thumbnailInputStream = new CustomInputStream(gateway, thumbnailINode, true);
-            file = new InputFile(
-                    node.getName(),
-                    targetNode.getPath(),
-                    iNode.getiNodeSize(),
-                    iNode.getCreationTime(),
-                    iNode.getLastModifiedTime(),
-                    fileInputStream,
-                    thumbnailInputStream,
-                    thumbnailINode.getiNodeSize());
+            // Node is a file.
+            InputFile file;
+            INode iNode = gateway.getINode(node.getiNodeAddress());
+            CustomInputStream fileInputStream = new CustomInputStream(gateway, iNode);
+            if (iNode.getThumbnailStoreAddress() == -1){
+                // No Thumbnail
+                file = new InputFile(
+                        node.getName(),
+                        targetNode.getPath(),
+                        iNode.getiNodeSize(),
+                        iNode.getCreationTime(),
+                        iNode.getLastModifiedTime(),
+                        fileInputStream);
+            } else {
+                INode thumbnailINode = gateway.getINode(iNode.getThumbnailStoreAddress());
+                CustomInputStream thumbnailInputStream = new CustomInputStream(gateway, thumbnailINode, true);
+                file = new InputFile(
+                        node.getName(),
+                        targetNode.getPath(),
+                        iNode.getiNodeSize(),
+                        iNode.getCreationTime(),
+                        iNode.getLastModifiedTime(),
+                        fileInputStream,
+                        thumbnailInputStream,
+                        thumbnailINode.getiNodeSize());
+            }
+            addFile(targetNode, file);
         }
-        addFile(targetNode, file);
         return true;
     }
 
